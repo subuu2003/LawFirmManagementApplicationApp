@@ -33,7 +33,7 @@ if [ ! -d "$REPO_DIR/frontend" ]; then
 fi
 cd "$REPO_DIR/frontend"
 npm install
-npm run build
+# npm run build (Disabled: building locally and pushing artifacts instead)
 pm2 restart lawfirm-frontend
 
 echo "=== DEPLOYMENT COMPLETE! ==="
