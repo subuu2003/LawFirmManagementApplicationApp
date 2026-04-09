@@ -1,0 +1,63 @@
+# Law Firm Management Application - Completed APIs List
+# Generated on: 2026-04-09
+
+Total APIs Completed: 41
+
+## Authentication APIs
+1. POST /api/auth/login_username_password/ - Login with username/email and password.
+2. POST /api/auth/request_phone_otp/ - Request OTP for phone-based login.
+3. POST /api/auth/request_email_otp/ - Request OTP for email-based login.
+4. POST /api/auth/verify_otp/ - Verify OTP and obtain authentication token.
+5. POST /api/auth/set_password/ - Set initial password for users added by admins.
+6. POST /api/auth/logout/ - Invalidate token and log out.
+
+## User Management APIs
+7. GET /api/users/ - List users (access restricted by role and firm).
+8. POST /api/users/ - Standard user creation endpoint.
+9. GET /api/users/{id}/ - Retrieve detailed profile of a specific user.
+10. PATCH /api/users/{id}/ - Partially update user profile information.
+11. DELETE /api/users/{id}/ - Remove a user from the system.
+12. POST /api/users/register/ - Public endpoint for Client self-registration.
+13. POST /api/users/add_user/ - Role-based user creation with automatic invitation workflow.
+14. POST /api/users/switch_firm/ - Switch active firm and branch context for multi-firm users.
+15. POST /api/users/change_password/ - Change password for the currently logged-in user.
+
+## Firm Management APIs
+16. GET /api/firms/ - List firms (Platform Owners see all, others see their own).
+17. POST /api/firms/ - Create a new law firm (Platform Owner/Partner Manager).
+18. GET /api/firms/{id}/ - Retrieve firm details and metadata.
+19. PATCH /api/firms/{id}/ - Update firm configurations and subscription status.
+20. DELETE /api/firms/{id}/ - Remove a firm from the platform.
+
+## Branch Management APIs
+21. GET /api/branches/ - List branches associated with the user's firms.
+22. POST /api/branches/ - Create a new branch for a specific firm.
+23. GET /api/branches/{id}/ - Retrieve branch details.
+24. PATCH /api/branches/{id}/ - Update branch contact information or address.
+25. DELETE /api/branches/{id}/ - Remove a branch.
+
+## Document Management APIs
+26. GET /api/documents/ - List documents uploaded by or shared with the user.
+27. POST /api/documents/ - Upload new documents (Aadhar, PAN, Bar Certificate, etc.).
+28. GET /api/documents/{id}/ - Retrieve document metadata and file URL.
+29. PATCH /api/documents/{id}/ - Update document or verify it (Admin only).
+30. DELETE /api/documents/{id}/ - Delete an uploaded document.
+
+## Invitation Management APIs
+31. GET /api/invitations/ - List pending and historical user invitations.
+32. GET /api/invitations/{id}/ - Retrieve specific invitation details and expiry status.
+
+## Partner Management APIs
+33. GET /api/partners/ - List independent partners/affiliates.
+34. POST /api/partners/ - Register as a system partner.
+35. GET /api/partners/{id}/ - Retrieve partner profile details.
+36. PATCH /api/partners/{id}/ - Update partner status or information.
+37. DELETE /api/partners/{id}/ - Remove a partner record.
+
+## Audit Log APIs
+38. GET /api/audit-logs/ - View system-wide or firm-specific activity logs with action/resource filters.
+39. GET /api/audit-logs/{id}/ - View detailed activity log entry.
+
+## Global Configuration APIs
+40. GET /api/config/settings/ - Retrieve global system settings (e.g., trial periods).
+41. PATCH /api/config/update_settings/ - Update global configurations (Platform Owner only).
