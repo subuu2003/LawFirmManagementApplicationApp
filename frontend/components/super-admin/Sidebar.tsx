@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Scale, LayoutDashboard, Users,
   Settings, ChevronRight, LogOut, Briefcase, FileText, CreditCard, BarChart2, ChevronDown, UserCheck, Store
 } from 'lucide-react';
+import { customFetch } from '@/lib/fetch';
+import { API } from '@/lib/api';
 
 const topNavItems = [
   { label: 'Dashboard', path: '/super-admin/dashboard', icon: LayoutDashboard },
@@ -32,6 +34,20 @@ const mockFirmBranches = [
 ];
 
 export default function SuperAdminSidebar() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await customFetch(API.AUTH.LOGOUT, { method: 'POST' });
+    } catch (e) {
+      console.error('Logout failed on backend:', e);
+    } finally {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user_details');
+      router.push('/login');
+    }
+  };
+
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = useState(
     () => pathname.startsWith('/super-admin/users')
@@ -208,10 +224,10 @@ export default function SuperAdminSidebar() {
           </div>
         </div>
         <div className="border-t border-gray-100 px-4 py-3">
-          <Link href="/login" className="flex items-center gap-2 text-[#984c1f] hover:opacity-75 transition-opacity">
+          <button onClick={handleLogout} className="flex items-center gap-2 text-[#984c1f] hover:opacity-75 transition-opacity">
             <LogOut className="w-4 h-4" />
             <span className="text-[13px] font-semibold">Sign Out</span>
-          </Link>
+          </button>
         </div>
       </div>
     </aside>

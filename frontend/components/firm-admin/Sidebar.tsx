@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Scale, LayoutDashboard, Briefcase, FileText,
   UserCheck, Bell, MessageSquare, LogOut, ChevronRight, Users, ChevronDown
 } from 'lucide-react';
+import { customFetch } from '@/lib/fetch';
+import { API } from '@/lib/api';
 
 const topNavItems = [
   { label: 'Dashboard', path: '/firm-admin/dashboard', icon: LayoutDashboard },
@@ -27,6 +29,20 @@ const bottomNavItems = [
 ];
 
 export default function FirmAdminSidebar() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await customFetch(API.AUTH.LOGOUT, { method: 'POST' });
+    } catch (e) {
+      console.error('Logout failed on backend:', e);
+    } finally {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user_details');
+      router.push('/login');
+    }
+  };
+
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = useState(
     () => pathname.startsWith('/firm-admin/users')
@@ -142,10 +158,10 @@ export default function FirmAdminSidebar() {
 
       <div className="border-t border-gray-100">
         <div className="border-t border-gray-100 px-4 py-3">
-          <Link href="/login" className="flex items-center gap-2 text-[#2a4365] hover:opacity-75 transition-opacity">
+          <button onClick={handleLogout} className="flex items-center gap-2 text-[#2a4365] hover:opacity-75 transition-opacity">
             <LogOut className="w-4 h-4" />
             <span className="text-[13px] font-semibold">Sign Out</span>
-          </Link>
+          </button>
         </div>
       </div>
     </aside>
