@@ -5,15 +5,24 @@ import { useRouter, useParams } from 'next/navigation';
 import {
   Briefcase, User, Users, Store, AlertCircle, Loader2, CheckCircle2,
   ChevronDown, Save, X, Hash, Building2, Scale, ArrowLeft, Pencil,
-  Calendar, Activity, FileText, Gavel, DollarSign, Clock, Copy, Check,
+  Calendar, Activity, FileText, Gavel, Clock, Copy, Check,
 } from 'lucide-react';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 import { Panel, SplitPanels, classNames } from './ui';
 import Link from 'next/link';
+import { useTopbarTitle } from './TopbarContext';
 
 // ─── types ───────────────────────────────────────────────────────────────────
 interface Option { value: string; label: string }
+
+const STATE_OPTIONS = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana',
+  'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana',
+  'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Andaman and Nicobar Islands', 'Chandigarh',
+  'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+];
 
 // ─── Mandatory Fields ──────────────────────────────────────────────────────
 const MANDATORY_FIELDS = {
@@ -100,26 +109,55 @@ function formatCurrency(value?: string | number | null) {
   return isNaN(num) ? null : `₹ ${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function normalizeDateInput(value?: string | null) {
+  if (!value) return '';
+  return value.split('T')[0];
+}
+
+function ensureOption(options: Option[], value?: string | null, label?: string | null): Option[] {
+  if (!value) return options;
+  if (options.some((o) => o.value === value)) return options;
+  return [...options, { value, label: label || value }];
+}
+
+function optionLabel(item: any): string {
+  const fullName = item.full_name || item.get_full_name;
+  const firstLast = [item.first_name, item.last_name].filter(Boolean).join(' ').trim();
+  return fullName || firstLast || item.username || item.branch_name || item.name || item.id || item.uuid || 'Unknown';
+}
+
+function sanitizeDecimalInput(value: string): string {
+  const cleaned = value.replace(/[^\d.]/g, '');
+  const parts = cleaned.split('.');
+  if (parts.length <= 1) return cleaned;
+  return `${parts[0]}.${parts.slice(1).join('')}`;
+}
+
+function normalizeNumericInput(value?: string | number | null): string {
+  if (value === null || value === undefined) return '';
+  const text = String(value).trim();
+  return /^\d*\.?\d*$/.test(text) ? text : '';
+}
+
 async function fetchDropdownOptions() {
-  const [clientsRes, advocatesRes, branchesRes] = await Promise.all([
+  const [clientsRes, advocatesRes, paralegalsRes, branchesRes] = await Promise.all([
     customFetch(`${API.USERS.LIST}?user_type=client`),
     customFetch(`${API.USERS.LIST}?user_type=advocate`),
+    customFetch(`${API.USERS.LIST}?user_type=paralegal`),
     customFetch(API.FIRMS.BRANCHES.LIST),
   ]);
-  const [clientsData, advocatesData, branchesData] = await Promise.all([
-    clientsRes.json(), advocatesRes.json(), branchesRes.json(),
+  const [clientsData, advocatesData, paralegalsData, branchesData] = await Promise.all([
+    clientsRes.json(), advocatesRes.json(), paralegalsRes.json(), branchesRes.json(),
   ]);
   const format = (list: any): Option[] =>
     (list.results || list).map((item: any) => ({
       value: item.id || item.uuid,
-      label:
-        item.full_name ||
-        `${item.first_name} ${item.last_name || ''}`.trim() ||
-        item.username || item.branch_name || item.name,
+      label: optionLabel(item),
     }));
   return {
     clients: format(clientsData),
     advocates: format(advocatesData),
+    paralegals: format(paralegalsData),
     branches: format(branchesData),
   };
 }
@@ -131,8 +169,15 @@ export function CaseViewForm({ editBase }: { editBase: string }) {
   const params = useParams();
   const caseId = params?.caseId as string;
   const [caseData, setCaseData] = useState<any>(null);
+  const [paralegalName, setParalegalName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Push dynamic title into topbar once case is loaded
+  useTopbarTitle(
+    caseData?.case_title ?? '',
+    caseData ? `Case • ${(caseData.category ?? '').replace('_', ' ')}` : '',
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -142,6 +187,30 @@ export function CaseViewForm({ editBase }: { editBase: string }) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Failed to fetch case.');
         setCaseData(data);
+        if (data.assigned_paralegal) {
+          if (data.paralegal_name) {
+            setParalegalName(data.paralegal_name);
+          } else {
+            try {
+              const userRes = await customFetch(API.USERS.DETAIL(data.assigned_paralegal));
+              const userData = await userRes.json();
+              if (userRes.ok) {
+                setParalegalName(
+                  userData.full_name ||
+                  `${userData.first_name || ''} ${userData.last_name || ''}`.trim() ||
+                  userData.username ||
+                  data.assigned_paralegal,
+                );
+              } else {
+                setParalegalName(data.assigned_paralegal);
+              }
+            } catch {
+              setParalegalName(data.assigned_paralegal);
+            }
+          }
+        } else {
+          setParalegalName(null);
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -216,7 +285,7 @@ export function CaseViewForm({ editBase }: { editBase: string }) {
                 <InfoRow label="Client" value={c.client_name} />
                 <InfoRow label="Assigned Advocate" value={c.advocate_name} />
                 <InfoRow label="Branch" value={c.branch_name} />
-                {c.assigned_paralegal && <InfoRow label="Paralegal" value={c.assigned_paralegal} />}
+                {c.assigned_paralegal && <InfoRow label="Paralegal" value={c.paralegal_name || paralegalName || c.assigned_paralegal} />}
               </div>
             </Panel>
 
@@ -272,7 +341,7 @@ export function CaseViewForm({ editBase }: { editBase: string }) {
                   <InfoRow label="Total Fee" value={formatCurrency(c.total_fee)} />
                   <InfoRow label="Hearing Fee" value={formatCurrency(c.hearing_fee)} />
                 </div>
-                {c.additional_expenses && <InfoRow label="Additional Expenses" value={c.additional_expenses} />}
+                {c.additional_expenses && <InfoRow label="Additional Expenses" value={formatCurrency(c.additional_expenses)} />}
                 {c.payment_terms && <InfoRow label="Payment Terms" value={c.payment_terms} />}
                 {c.loe_notes && <InfoRow label="LOE Notes" value={<span className="whitespace-pre-line leading-relaxed text-sm">{c.loe_notes}</span>} />}
               </div>
@@ -344,6 +413,7 @@ export function CaseViewForm({ editBase }: { editBase: string }) {
                 <InfoRow label="Branch ID" value={<span className="font-mono text-[10px] text-gray-500 break-all">{c.branch}</span>} copyable />
                 <InfoRow label="Client ID" value={<span className="font-mono text-[10px] text-gray-500 break-all">{c.client}</span>} copyable />
                 <InfoRow label="Advocate ID" value={<span className="font-mono text-[10px] text-gray-500 break-all">{c.assigned_advocate}</span>} copyable />
+                {c.assigned_paralegal && <InfoRow label="Paralegal ID" value={<span className="font-mono text-[10px] text-gray-500 break-all">{c.assigned_paralegal}</span>} copyable />}
               </div>
             </Panel>
           </div>
@@ -362,7 +432,12 @@ export function CaseEditForm({ viewBase }: { viewBase: string }) {
   const caseId = params?.caseId as string;
 
   const [form, setForm] = useState<any>(null);
-  const [options, setOptions] = useState<{ clients: Option[]; advocates: Option[]; branches: Option[] }>({ clients: [], advocates: [], branches: [] });
+  const [options, setOptions] = useState<{ clients: Option[]; advocates: Option[]; paralegals: Option[]; branches: Option[] }>({
+    clients: [],
+    advocates: [],
+    paralegals: [],
+    branches: [],
+  });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -392,12 +467,13 @@ export function CaseEditForm({ viewBase }: { viewBase: string }) {
           stage: data.stage ?? 'case_filing',
           client: data.client ?? '',
           assigned_advocate: data.assigned_advocate ?? '',
+          assigned_paralegal: data.assigned_paralegal ?? '',
           branch: data.branch ?? '',
           billing_type: data.billing_type ?? 'hourly',
           estimated_value: data.estimated_value ?? '',
           total_fee: data.total_fee ?? '',
           hearing_fee: data.hearing_fee ?? '',
-          additional_expenses: data.additional_expenses ?? '',
+          additional_expenses: normalizeNumericInput(data.additional_expenses),
           payment_terms: data.payment_terms ?? '',
           loe_notes: data.loe_notes ?? '',
           petitioner_name: data.petitioner_name ?? '',
@@ -410,10 +486,15 @@ export function CaseEditForm({ viewBase }: { viewBase: string }) {
           state: data.state ?? '',
           representing: data.representing ?? '',
           cnr_number: data.cnr_number ?? '',
-          filing_date: data.filing_date ?? '',
-          next_hearing_date: data.next_hearing_date ?? '',
+          filing_date: normalizeDateInput(data.filing_date),
+          next_hearing_date: normalizeDateInput(data.next_hearing_date),
         });
-        setOptions(opts);
+        setOptions({
+          clients: ensureOption(opts.clients, data.client, data.client_name),
+          advocates: ensureOption(opts.advocates, data.assigned_advocate, data.advocate_name),
+          paralegals: ensureOption(opts.paralegals, data.assigned_paralegal, data.paralegal_name),
+          branches: ensureOption(opts.branches, data.branch, data.branch_name),
+        });
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -443,9 +524,9 @@ export function CaseEditForm({ viewBase }: { viewBase: string }) {
         'court_name', 'court_no', 'judge_name', 'district', 'state', 'representing',
         'cnr_number', 'description', 'case_summary', 'opposing_counsel',
         'respondent_name', 'petitioner_name', 'case_number', 'payment_terms',
-        'loe_notes', 'additional_expenses', 'next_hearing_date',
+        'loe_notes', 'next_hearing_date', 'assigned_paralegal',
       ];
-      const nullableDecimals = ['estimated_value', 'total_fee', 'hearing_fee'];
+      const nullableDecimals = ['estimated_value', 'total_fee', 'hearing_fee', 'additional_expenses'];
 
       const payload: Record<string, any> = { ...form };
 
@@ -602,11 +683,18 @@ export function CaseEditForm({ viewBase }: { viewBase: string }) {
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Stage</FieldLabel>
                       <select value={form.stage} onChange={e => set('stage', e.target.value)} className={sel()}>
+                        <option value="initial_consultation">Initial Consultation and Case Assessment</option>
+                        <option value="document_collection">Document Collection</option>
+                        <option value="case_research">Case Research and Analysis</option>
+                        <option value="notice_drafting">Notice / Legal Drafting</option>
+                        <option value="negotiation">Negotiation / Mediation</option>
                         <option value="case_filing">Case Filing</option>
-                        <option value="evidence">Evidence</option>
-                        <option value="arguments">Arguments</option>
-                        <option value="judgment">Judgment</option>
-                        <option value="disposed">Disposed</option>
+                        <option value="hearing">Hearing</option>
+                        <option value="evidence">Evidence and Arguments</option>
+                        <option value="judgment">Judgment / Order</option>
+                        <option value="appeal">Appeal</option>
+                        <option value="execution">Execution / Compliance</option>
+                        <option value="closed">Case Closed</option>
                       </select>
                     </div>
                   </div>
@@ -651,6 +739,19 @@ export function CaseEditForm({ viewBase }: { viewBase: string }) {
                         <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                       </div>
                     </div>
+                    <div className="flex flex-col gap-1.5">
+                      <FieldLabel>Assigned Paralegal</FieldLabel>
+                      <div className="relative">
+                        <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <select value={form.assigned_paralegal || ''} onChange={e => set('assigned_paralegal', e.target.value)} className={classNames(sel(), 'pl-11 pr-10')}>
+                          <option value="">Select Paralegal</option>
+                          {options.paralegals.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel required={MANDATORY_FIELDS.branch}>Branch</FieldLabel>
                       <div className="relative">
@@ -699,13 +800,22 @@ export function CaseEditForm({ viewBase }: { viewBase: string }) {
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>State</FieldLabel>
-                      <input value={form.state} onChange={e => set('state', e.target.value)} placeholder="State" className={inp()} />
+                      <select value={form.state} onChange={e => set('state', e.target.value)} className={sel()}>
+                        <option value="">Select State</option>
+                        {STATE_OPTIONS.map((state) => (
+                          <option key={state} value={state}>{state}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Representing</FieldLabel>
-                      <input value={form.representing} onChange={e => set('representing', e.target.value)} placeholder="Petitioner / Respondent" className={inp()} />
+                      <select value={form.representing} onChange={e => set('representing', e.target.value)} className={sel()}>
+                        <option value="">Select Party</option>
+                        <option value="petitioner">Petitioner</option>
+                        <option value="respondent">Respondent</option>
+                      </select>
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Filing Date</FieldLabel>
@@ -786,21 +896,21 @@ export function CaseEditForm({ viewBase }: { viewBase: string }) {
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Estimated Value (₹)</FieldLabel>
-                      <input type="text" value={form.estimated_value} onChange={e => set('estimated_value', e.target.value)} placeholder="45000.00" className={inp()} />
+                      <input type="text" inputMode="decimal" value={form.estimated_value} onChange={e => set('estimated_value', sanitizeDecimalInput(e.target.value))} placeholder="45000.00" className={inp()} />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Total Fee (₹)</FieldLabel>
-                      <input type="text" value={form.total_fee} onChange={e => set('total_fee', e.target.value)} placeholder="e.g. 80000" className={inp()} />
+                      <input type="text" inputMode="decimal" value={form.total_fee} onChange={e => set('total_fee', sanitizeDecimalInput(e.target.value))} placeholder="e.g. 80000" className={inp()} />
                     </div>
                   </div>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Hearing Fee (₹)</FieldLabel>
-                      <input type="text" value={form.hearing_fee} onChange={e => set('hearing_fee', e.target.value)} placeholder="e.g. 5000" className={inp()} />
+                      <input type="text" inputMode="decimal" value={form.hearing_fee} onChange={e => set('hearing_fee', sanitizeDecimalInput(e.target.value))} placeholder="e.g. 5000" className={inp()} />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Additional Expenses</FieldLabel>
-                      <input value={form.additional_expenses} onChange={e => set('additional_expenses', e.target.value)} placeholder="At actuals" className={inp()} />
+                      <input type="text" inputMode="decimal" value={form.additional_expenses} onChange={e => set('additional_expenses', sanitizeDecimalInput(e.target.value))} placeholder="e.g. 1200.00" className={inp()} />
                     </div>
                   </div>
                   <div className="flex flex-col gap-1.5">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Briefcase, Gavel, User, Users, Store, AlertCircle, Loader2, CheckCircle2, FileText, ChevronDown, Save, X, Hash, MapPin, Layers, Building2, Check, Scale, DollarSign, FileCheck } from 'lucide-react';
+import { Briefcase, Gavel, User, Users, Store, AlertCircle, Loader2, CheckCircle2, FileText, ChevronDown, Save, X, Hash, MapPin, Layers, Building2, Check, Scale, FileCheck } from 'lucide-react';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 import { Panel, SplitPanels, classNames } from './ui';
@@ -10,6 +10,27 @@ import { Panel, SplitPanels, classNames } from './ui';
 interface Option {
   value: string;
   label: string;
+}
+
+const STATE_OPTIONS = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana',
+  'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana',
+  'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Andaman and Nicobar Islands', 'Chandigarh',
+  'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+];
+
+function optionLabel(item: any): string {
+  const fullName = item.full_name || item.get_full_name;
+  const firstLast = [item.first_name, item.last_name].filter(Boolean).join(' ').trim();
+  return fullName || firstLast || item.username || item.branch_name || item.name || item.id || item.uuid || 'Unknown';
+}
+
+function sanitizeDecimalInput(value: string): string {
+  const cleaned = value.replace(/[^\d.]/g, '');
+  const parts = cleaned.split('.');
+  if (parts.length <= 1) return cleaned;
+  return `${parts[0]}.${parts.slice(1).join('')}`;
 }
 
 // ─── Mandatory Fields Mapping ───────────────────────────────────────────────
@@ -49,6 +70,7 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
     billing_type: 'hourly',
     estimated_value: '',
     assigned_advocate: '',
+    assigned_paralegal: '',
     branch: '',
     court_name: '',
     filing_date: new Date().toISOString().split('T')[0],
@@ -67,7 +89,7 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
     representing: '',
     cnr_number: '',
     next_hearing_date: '',
-    additional_expenses: 'At actuals',
+    additional_expenses: '',
     total_fee: '',
     hearing_fee: '',
   });
@@ -81,10 +103,12 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
   const [options, setOptions] = useState<{
     clients: Option[];
     advocates: Option[];
+    paralegals: Option[];
     branches: Option[];
   }>({
     clients: [],
     advocates: [],
+    paralegals: [],
     branches: []
   });
 
@@ -100,27 +124,30 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
     const fetchData = async () => {
       try {
         setFetchingData(true);
-        const [clientsRes, advocatesRes, branchesRes] = await Promise.all([
+        const [clientsRes, advocatesRes, paralegalsRes, branchesRes] = await Promise.all([
           customFetch(`${API.USERS.LIST}?user_type=client`),
           customFetch(`${API.USERS.LIST}?user_type=advocate`),
+          customFetch(`${API.USERS.LIST}?user_type=paralegal`),
           customFetch(API.FIRMS.BRANCHES.LIST)
         ]);
 
-        const [clientsData, advocatesData, branchesData] = await Promise.all([
+        const [clientsData, advocatesData, paralegalsData, branchesData] = await Promise.all([
           clientsRes.json(),
           advocatesRes.json(),
+          paralegalsRes.json(),
           branchesRes.json()
         ]);
 
         const format = (list: any) =>
           (list.results || list).map((item: any) => ({
             value: item.id || item.uuid,
-            label: item.full_name || item.get_full_name || `${item.first_name} ${item.last_name || ''}`.trim() || item.username || item.branch_name || item.name
+            label: optionLabel(item)
           }));
 
         setOptions({
           clients: format(clientsData),
           advocates: format(advocatesData),
+          paralegals: format(paralegalsData),
           branches: format(branchesData)
         });
       } catch (err: any) {
@@ -154,6 +181,7 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
         'respondent_name', 'case_number', 'court_no', 'judge_name',
         'district', 'state', 'representing', 'cnr_number', 'case_summary',
         'payment_terms', 'loe_notes', 'petitioner_name', 'next_hearing_date',
+        'assigned_paralegal',
       ];
       const payload: Record<string, any> = { ...form };
 
@@ -180,6 +208,13 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
       } else {
         const parsed = parseFloat(payload.hearing_fee);
         payload.hearing_fee = isNaN(parsed) ? null : parsed;
+      }
+
+      if (payload.additional_expenses === '' || payload.additional_expenses === null) {
+        payload.additional_expenses = null;
+      } else {
+        const parsed = parseFloat(payload.additional_expenses);
+        payload.additional_expenses = isNaN(parsed) ? null : parsed;
       }
 
       const response = await customFetch(API.CASES.CREATE, {
@@ -279,7 +314,7 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                           value={form.case_number}
                           onChange={e => set('case_number', e.target.value)}
                           placeholder="2026-IP-003"
-                          className="h-11 w-full rounded-xl border border-gray-100 bg-gray-50/50 pl-11 px-4 text-sm font-semibold outline-none focus:bg-white focus:border-[#984c1f] transition-all"
+                          className="h-11 w-full rounded-xl border border-gray-100 bg-gray-50/50 pl-11 px-4 text-sm font-semibold text-gray-900 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
                         />
                       </div>
                     </div>
@@ -295,6 +330,41 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                           className="h-11 w-full rounded-xl border border-gray-100 bg-gray-50/50 pl-11 px-4 text-sm font-semibold text-gray-900 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
                         />
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <FieldLabel>Category</FieldLabel>
+                      <select
+                        value={form.category}
+                        onChange={e => set('category', e.target.value)}
+                        className="h-11 w-full appearance-none rounded-xl border border-gray-100 bg-gray-50/50 px-4 text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
+                      >
+                        <option value="pre_litigation">Pre-litigation</option>
+                        <option value="court_case">Court Case</option>
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <FieldLabel>Stage</FieldLabel>
+                      <select
+                        value={form.stage}
+                        onChange={e => set('stage', e.target.value)}
+                        className="h-11 w-full appearance-none rounded-xl border border-gray-100 bg-gray-50/50 px-4 text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
+                      >
+                        <option value="initial_consultation">Initial Consultation and Case Assessment</option>
+                        <option value="document_collection">Document Collection</option>
+                        <option value="case_research">Case Research and Analysis</option>
+                        <option value="notice_drafting">Notice / Legal Drafting</option>
+                        <option value="negotiation">Negotiation / Mediation</option>
+                        <option value="case_filing">Case Filing</option>
+                        <option value="hearing">Hearing</option>
+                        <option value="evidence">Evidence and Arguments</option>
+                        <option value="judgment">Judgment / Order</option>
+                        <option value="appeal">Appeal</option>
+                        <option value="execution">Execution / Compliance</option>
+                        <option value="closed">Case Closed</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -337,6 +407,23 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                         <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                       </div>
                     </div>
+                    <div className="flex flex-col gap-1.5">
+                      <FieldLabel>Assigned Paralegal</FieldLabel>
+                      <div className="relative group">
+                        <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <select
+                          value={form.assigned_paralegal}
+                          onChange={e => set('assigned_paralegal', e.target.value)}
+                          className="h-11 w-full appearance-none rounded-xl border border-gray-100 bg-gray-50/50 pl-11 pr-10 text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
+                        >
+                          <option value="">Select Paralegal</option>
+                          {options.paralegals.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel required={MANDATORY_FIELDS.branch}>Branch</FieldLabel>
                       <div className="relative group">
@@ -437,12 +524,14 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>State</FieldLabel>
-                      <input
+                      <select
                         value={form.state}
                         onChange={e => set('state', e.target.value)}
-                        placeholder="State"
-                        className="h-11 w-full rounded-xl border border-gray-100 bg-gray-50/50 px-4 text-sm font-semibold text-gray-900 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
-                      />
+                        className="h-11 w-full appearance-none rounded-xl border border-gray-100 bg-gray-50/50 px-4 text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
+                      >
+                        <option value="">Select State</option>
+                        {STATE_OPTIONS.map((state) => <option key={state} value={state}>{state}</option>)}
+                      </select>
                     </div>
                   </div>
 
@@ -458,12 +547,15 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Representing</FieldLabel>
-                      <input
+                      <select
                         value={form.representing}
                         onChange={e => set('representing', e.target.value)}
-                        placeholder="Petitioner / Respondent"
-                        className="h-11 w-full rounded-xl border border-gray-100 bg-gray-50/50 px-4 text-sm font-semibold text-gray-900 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
-                      />
+                        className="h-11 w-full appearance-none rounded-xl border border-gray-100 bg-gray-50/50 px-4 text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
+                      >
+                        <option value="">Select Party</option>
+                        <option value="petitioner">Petitioner</option>
+                        <option value="respondent">Respondent</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -526,11 +618,12 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Value (Est.)</FieldLabel>
                       <div className="relative">
-                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">₹</span>
                         <input
                           type="text"
+                          inputMode="decimal"
                           value={form.estimated_value}
-                          onChange={e => set('estimated_value', e.target.value)}
+                          onChange={e => set('estimated_value', sanitizeDecimalInput(e.target.value))}
                           placeholder="45000.00"
                           className="h-11 w-full rounded-xl border border-gray-100 bg-gray-50/50 pl-11 px-4 text-sm font-semibold text-gray-900 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
                         />
@@ -542,11 +635,12 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Total Fee</FieldLabel>
                       <div className="relative">
-                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">₹</span>
                         <input
                           type="text"
+                          inputMode="decimal"
                           value={form.total_fee}
-                          onChange={e => set('total_fee', e.target.value)}
+                          onChange={e => set('total_fee', sanitizeDecimalInput(e.target.value))}
                           placeholder="80000.00"
                           className="h-11 w-full rounded-xl border border-gray-100 bg-gray-50/50 pl-11 px-4 text-sm font-semibold text-gray-900 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
                         />
@@ -555,11 +649,12 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Hearing Fee</FieldLabel>
                       <div className="relative">
-                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">₹</span>
                         <input
                           type="text"
+                          inputMode="decimal"
                           value={form.hearing_fee}
-                          onChange={e => set('hearing_fee', e.target.value)}
+                          onChange={e => set('hearing_fee', sanitizeDecimalInput(e.target.value))}
                           placeholder="5000.00"
                           className="h-11 w-full rounded-xl border border-gray-100 bg-gray-50/50 pl-11 px-4 text-sm font-semibold text-gray-900 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
                         />
@@ -580,9 +675,11 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                     <div className="flex flex-col gap-1.5">
                       <FieldLabel>Additional Expenses</FieldLabel>
                       <input
+                        type="text"
+                        inputMode="decimal"
                         value={form.additional_expenses}
-                        onChange={e => set('additional_expenses', e.target.value)}
-                        placeholder="At actuals"
+                        onChange={e => set('additional_expenses', sanitizeDecimalInput(e.target.value))}
+                        placeholder="1200.00"
                         className="h-11 w-full rounded-xl border border-gray-100 bg-gray-50/50 px-4 text-sm font-semibold text-gray-900 outline-none focus:bg-white focus:border-[#984c1f] transition-all"
                       />
                     </div>
