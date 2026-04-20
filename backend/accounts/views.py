@@ -853,6 +853,8 @@ class GlobalConfigurationViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Only platform owner can access"""
+        if not self.request.user.is_authenticated:
+            return GlobalConfiguration.objects.none()
         if self.request.user.user_type != 'platform_owner':
             return GlobalConfiguration.objects.none()
         return GlobalConfiguration.objects.all()
