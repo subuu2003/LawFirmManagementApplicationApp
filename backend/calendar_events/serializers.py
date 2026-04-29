@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import CalendarEvent
 from accounts.serializers import UserBriefSerializer
+from core.serializers import ClientField
 
 
 class CalendarEventSerializer(serializers.ModelSerializer):
@@ -8,6 +9,7 @@ class CalendarEventSerializer(serializers.ModelSerializer):
     assigned_to_details = UserBriefSerializer(source='assigned_to', many=True, read_only=True)
     case_title = serializers.CharField(source='case.case_title', read_only=True)
     case_number = serializers.CharField(source='case.case_number', read_only=True)
+    client = ClientField(required=False, allow_null=True)
     client_name = serializers.CharField(source='client.get_full_name', read_only=True)
     is_upcoming = serializers.BooleanField(read_only=True)
     is_past = serializers.BooleanField(read_only=True)

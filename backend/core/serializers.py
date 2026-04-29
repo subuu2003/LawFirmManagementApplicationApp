@@ -243,3 +243,47 @@ class ChangePasswordSerializer(serializers.Serializer):
         if data['new_password'] != data.pop('new_password_confirm'):
             raise serializers.ValidationError({'new_password': 'Passwords do not match'})
         return data
+
+
+# ============================================================================
+# SHARED FIELDS
+# ============================================================================
+
+class ClientField(serializers.Field):
+    """
+    A reusable field that accepts either:
+    - A Client profile UUID  (clients.Client.id)
+    - A User account UUID    (accounts.CustomUser.id)
+    
+    Always resolves and stores the Client profile ID.
+    Use this everywhere a 'client' FK to clients.Client is needed.
+    """
+
+    def to_representation(self, value):
+        return str(value.id) if value else None
+
+    def to_internal_value(self, data):
+        from clients.models import Client
+        from accounts.models import CustomUser
+
+        # Try direct client profile ID first
+        try:
+            return Client.objects.get(id=data)
+        except (Client.DoesNotExist, Exception):
+            pass
+
+        # Try user account ID
+        try:
+            user = CustomUser.objects.get(id=data)
+            client_profile = getattr(user, 'client_profile', None)
+            if client_profile:
+                return client_profile
+            raise serializers.ValidationError(
+                f'No client profile found for user {data}. Ask admin to create a client profile first.'
+            )
+        except CustomUser.DoesNotExist:
+            pass
+
+        raise serializers.ValidationError(
+            f'Invalid client ID "{data}" — not a valid client profile or user account.'
+        )

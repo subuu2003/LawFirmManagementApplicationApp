@@ -2,6 +2,7 @@ from rest_framework import serializers
 from decimal import Decimal
 from .models import TimeEntry, Expense, Invoice, Payment, TrustAccount, AdvocateInvoice
 from accounts.serializers import UserBriefSerializer
+from core.serializers import ClientField
 
 
 class TimeEntrySerializer(serializers.ModelSerializer):
@@ -72,6 +73,7 @@ class InvoiceExpenseInlineSerializer(serializers.Serializer):
 
 class InvoiceListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for invoice list"""
+    client = ClientField()
     client_name = serializers.CharField(source='client.get_full_name', read_only=True)
     client_user_account_id = serializers.UUIDField(source='client.user_account.id', read_only=True, default=None)
     case_title = serializers.CharField(source='case.case_title', read_only=True)
@@ -89,6 +91,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
+    client = ClientField()
     client_name = serializers.CharField(source='client.get_full_name', read_only=True)
     client_user_account_id = serializers.UUIDField(source='client.user_account.id', read_only=True, default=None)
     case_title = serializers.CharField(source='case.case_title', read_only=True)
@@ -212,6 +215,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    client = ClientField()
     client_name = serializers.CharField(source='client.get_full_name', read_only=True)
     invoice_number = serializers.CharField(source='invoice.invoice_number', read_only=True)
     recorded_by_name = serializers.CharField(source='recorded_by.get_full_name', read_only=True)
@@ -230,6 +234,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
 
 class TrustAccountSerializer(serializers.ModelSerializer):
+    client = ClientField()
     client_name = serializers.CharField(source='client.get_full_name', read_only=True)
     case_title = serializers.CharField(source='case.case_title', read_only=True)
     recorded_by_name = serializers.CharField(source='recorded_by.get_full_name', read_only=True)
