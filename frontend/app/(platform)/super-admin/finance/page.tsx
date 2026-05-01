@@ -45,7 +45,7 @@ export default function FinanceDashboard() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await customFetch(API.BILLING.FINANCE_OVERVIEW);
+        const response = await customFetch(API.BILLING.FINANCE_OVERVIEW.DASHBOARD);
         if (!response.ok) throw new Error('Failed to fetch finance dashboard data');
         const json = await response.json();
         setData(json);

@@ -516,9 +516,9 @@ export default function ClientInvoicesPage() {
                         logo={firmProfile?.logo || firmProfile?.profile_image || null}
                         subtotal={parseFloat(selectedInvoice.subtotal) || 0}
                         perLineTax={[]}
-                        taxOverride={parseFloat(selectedInvoice.tax_amount) || 0}
-                        taxLabelOverride={`Tax (${parseFloat(selectedInvoice.tax_percentage) || 0}%)`}
-                        totalAmountOverride={parseFloat(selectedInvoice.total_amount) || 0}
+                        taxOverride={(parseFloat(selectedInvoice.tax_amount) || null) as any}
+                        taxLabelOverride={`Tax (${parseFloat(selectedInvoice.tax_percentage) || 0}%)` as any}
+                        totalAmountOverride={(parseFloat(selectedInvoice.total_amount) || null) as any}
                         fmt={(v: number) =>
                           `₹${Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
                         }
