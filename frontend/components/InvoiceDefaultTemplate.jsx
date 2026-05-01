@@ -128,8 +128,8 @@ function DefaultTemplate({
   const effectiveTax = taxOverride !== null
     ? Number(taxOverride) || 0
     : (taxTypes.CGST || taxTypes.SGST || taxTypes.IGST || taxTypes.UTGST
-        ? cgstTotal + sgstTotal + igstTotal + utgstTotal
-        : gstTotal);
+      ? cgstTotal + sgstTotal + igstTotal + utgstTotal
+      : gstTotal);
 
   const total = Math.max(0, subtotal - discountAmt + effectiveTax + shippingN);
 

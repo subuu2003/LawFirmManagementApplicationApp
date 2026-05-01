@@ -1,6 +1,9 @@
 import { API_BASE_URL } from './api';
 
 export const customFetch = async (endPoint: string, config: RequestInit = {}, headerKey?: string) => {
+  if (typeof endPoint !== 'string') {
+    throw new Error(`API Error: Endpoint must be a string, but received ${typeof endPoint}. This usually means an object from the API reference was passed instead of a specific endpoint string.`);
+  }
   const url = `${API_BASE_URL}${endPoint.startsWith("/") ? endPoint : `/${endPoint}`}`;
 
   const headers = new Headers(config.headers || {});

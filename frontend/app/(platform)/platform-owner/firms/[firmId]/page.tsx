@@ -5,14 +5,15 @@ import Link from 'next/link';
 import {
   Building2, Users, Briefcase, FileSignature, Shield, ArrowLeft,
   Edit, Save, X, Calendar, DollarSign, Download, Clock, Loader2,
-  Mail, Phone, MapPin, Globe, Hash, Upload, Trash2
+  Mail, Phone, MapPin, Globe, Hash, Upload, Trash2,
+  CreditCard, RefreshCw, CheckCircle2, AlertTriangle, ChevronRight, Zap
 } from 'lucide-react';
 import {
   BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
 import { customFetch } from '@/lib/fetch';
-import { API, API_BASE_URL } from '@/lib/api';
+import { API, API_BASE_URL, SUBSCRIPTION_PLANS } from '@/lib/api';
 import { useTopbarTitle } from '@/components/platform/TopbarContext';
 
 const BRAND = '#0e2340';
@@ -31,7 +32,15 @@ interface FirmDetail {
   email: string;
   website: string;
   subscription_type: string;
+  subscription_end_date: string | null;
+  trial_end_date: string | null;
+  subscription_status: string;
+  days_until_expiry: number | null;
   is_active: boolean;
+  is_suspended: boolean;
+  branch_limit: number;
+  current_branch_count: number;
+  remaining_branches: number;
   branches: any[];
   created_at: string;
   updated_at: string;
@@ -63,6 +72,26 @@ export default function PlatformOwnerFirmOverviewPage({
   const [firm, setFirm] = useState<FirmDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Billing / Subscription state
+  const [billingEdit, setBillingEdit] = useState(false);
+  const [billingForm, setBillingForm] = useState({
+    subscription_type: '',
+    subscription_end_date: '',
+    trial_end_date: '',
+    is_suspended: false,
+  });
+  const [billingSaving, setBillingSaving] = useState(false);
+  const [billingMsg, setBillingMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Renew modal state
+  const [renewOpen, setRenewOpen] = useState(false);
+  const [renewForm, setRenewForm] = useState({
+    plan_id: '',
+    duration_months: 1,
+  });
+  const [renewing, setRenewing] = useState(false);
+  const [renewMsg, setRenewMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Push firm name into the topbar dynamically once loaded
   useTopbarTitle(
@@ -110,6 +139,12 @@ export default function PlatformOwnerFirmOverviewPage({
           state: data.state || '',
           country: data.country || 'India',
           postal_code: data.postal_code || '',
+        });
+        setBillingForm({
+          subscription_type: data.subscription_type,
+          subscription_end_date: data.subscription_end_date ? data.subscription_end_date.slice(0, 16) : '',
+          trial_end_date: data.trial_end_date ? data.trial_end_date.slice(0, 16) : '',
+          is_suspended: data.is_suspended ?? false,
         });
         setLogoPreview(data.logo ? (data.logo.startsWith('http') ? data.logo : `${API_BASE_URL}${data.logo}`) : null);
       } catch (err: any) {
@@ -179,6 +214,81 @@ export default function PlatformOwnerFirmOverviewPage({
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const formatDateFull = (dateStr: string | null) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const handleBillingSave = async () => {
+    try {
+      setBillingSaving(true);
+      setBillingMsg(null);
+      const payload = {
+        subscription_type: billingForm.subscription_type,
+        subscription_end_date: billingForm.subscription_end_date ? new Date(billingForm.subscription_end_date).toISOString() : null,
+        trial_end_date: billingForm.trial_end_date ? new Date(billingForm.trial_end_date).toISOString() : null,
+        is_suspended: billingForm.is_suspended,
+      };
+      const res = await customFetch(API.FIRMS.DETAIL(firmId), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.message || 'Failed to update subscription');
+      setFirm(data);
+      setBillingForm({
+        subscription_type: data.subscription_type,
+        subscription_end_date: data.subscription_end_date ? data.subscription_end_date.slice(0, 16) : '',
+        trial_end_date: data.trial_end_date ? data.trial_end_date.slice(0, 16) : '',
+        is_suspended: data.is_suspended ?? false,
+      });
+      setBillingEdit(false);
+      setBillingMsg({ type: 'success', text: 'Subscription updated successfully.' });
+    } catch (err: any) {
+      setBillingMsg({ type: 'error', text: err.message || 'Update failed.' });
+    } finally {
+      setBillingSaving(false);
+    }
+  };
+
+  const handleRenew = async () => {
+    try {
+      setRenewing(true);
+      setRenewMsg(null);
+      const res = await customFetch(API.SUBSCRIPTIONS.ACTIVATE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firm_id: firmId,
+          plan_id: renewForm.plan_id,
+          duration_months: renewForm.duration_months,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.message || 'Activation failed');
+      setRenewMsg({ type: 'success', text: 'Subscription activated successfully!' });
+      // Refresh firm data
+      const firmRes = await customFetch(API.FIRMS.DETAIL(firmId));
+      const firmData = await firmRes.json();
+      if (firmRes.ok) {
+        setFirm(firmData);
+        setBillingForm({
+          subscription_type: firmData.subscription_type,
+          subscription_end_date: firmData.subscription_end_date ? firmData.subscription_end_date.slice(0, 16) : '',
+          trial_end_date: firmData.trial_end_date ? firmData.trial_end_date.slice(0, 16) : '',
+          is_suspended: firmData.is_suspended ?? false,
+        });
+      }
+      setTimeout(() => { setRenewOpen(false); setRenewMsg(null); }, 2000);
+    } catch (err: any) {
+      setRenewMsg({ type: 'error', text: err.message || 'Activation failed.' });
+    } finally {
+      setRenewing(false);
+    }
   };
 
   if (loading) {
@@ -353,12 +463,320 @@ export default function PlatformOwnerFirmOverviewPage({
         </div>
       ) : activeTab === 'Billing' ? (
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-            <DollarSign className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-gray-400">Billing Coming Soon</h3>
-            <p className="text-sm text-gray-300 mt-1">Billing and invoice data will be available when the backend endpoint is ready.</p>
+
+          {/* ── Status Alert Banner ── */}
+          {billingMsg && (
+            <div className={`flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold ${billingMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+              {billingMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+              {billingMsg.text}
+              <button onClick={() => setBillingMsg(null)} className="ml-auto"><X className="w-4 h-4" /></button>
+            </div>
+          )}
+
+          {/* ── Subscription Summary Cards ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              {
+                label: 'Plan', icon: Zap,
+                value: <span className="capitalize">{firm.subscription_type}</span>,
+                bg: 'bg-violet-50', color: 'text-violet-600',
+              },
+              {
+                label: 'Status', icon: CheckCircle2,
+                value: (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                    firm.subscription_status === 'active' ? 'bg-emerald-100 text-emerald-700'
+                    : firm.subscription_status === 'trial' ? 'bg-blue-100 text-blue-700'
+                    : 'bg-red-100 text-red-700'
+                  }`}>
+                    {firm.subscription_status ?? '—'}
+                  </span>
+                ),
+                bg: 'bg-emerald-50', color: 'text-emerald-600',
+              },
+              {
+                label: 'Days Until Expiry', icon: Clock,
+                value: firm.days_until_expiry != null
+                  ? <span className={firm.days_until_expiry <= 7 ? 'text-red-600 font-extrabold' : ''}>{firm.days_until_expiry}d</span>
+                  : '—',
+                bg: 'bg-amber-50', color: 'text-amber-600',
+              },
+              {
+                label: 'Account', icon: Shield,
+                value: firm.is_suspended
+                  ? <span className="text-red-600 font-bold">Suspended</span>
+                  : <span className="text-emerald-600 font-bold">Active</span>,
+                bg: firm.is_suspended ? 'bg-red-50' : 'bg-emerald-50',
+                color: firm.is_suspended ? 'text-red-600' : 'text-emerald-600',
+              },
+            ].map((card, i) => {
+              const Icon = card.icon;
+              return (
+                <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 hover:border-gray-200 transition-all">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${card.bg}`}>
+                    <Icon className={`w-5 h-5 ${card.color}`} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 mb-1">{card.label}</p>
+                    <div className="text-base font-bold text-gray-900">{card.value}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+
+          {/* ── Subscription Details & Edit ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-gray-400" /> Subscription Details
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">Manage plan type, expiry dates and account suspension.</p>
+              </div>
+              <div className="flex gap-2">
+                {!billingEdit ? (
+                  <button
+                    onClick={() => { setBillingEdit(true); setBillingMsg(null); }}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-[#0e2340] border border-[#0e2340]/20 bg-[#0e2340]/5 rounded-xl hover:bg-[#0e2340]/10 transition-colors"
+                  >
+                    <Edit className="w-3.5 h-3.5" /> Edit
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => { setBillingEdit(false); setBillingMsg(null); setBillingForm({ subscription_type: firm.subscription_type, subscription_end_date: firm.subscription_end_date ? firm.subscription_end_date.slice(0,16) : '', trial_end_date: firm.trial_end_date ? firm.trial_end_date.slice(0,16) : '', is_suspended: firm.is_suspended ?? false }); }}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-200 bg-white rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" /> Discard
+                    </button>
+                    <button
+                      onClick={handleBillingSave}
+                      disabled={billingSaving}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-[#0e2340] rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
+                    >
+                      {billingSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      {billingSaving ? 'Saving…' : 'Save Changes'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {billingEdit ? (
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Subscription Plan</label>
+                    <select
+                      value={billingForm.subscription_type}
+                      onChange={e => setBillingForm({ ...billingForm, subscription_type: e.target.value })}
+                      className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0e2340]/20 focus:border-[#0e2340] focus:bg-white"
+                    >
+                      <option value="trial">Trial</option>
+                      <option value="basic">Basic</option>
+                      <option value="professional">Professional</option>
+                      <option value="enterprise">Enterprise</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Account Suspension</label>
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setBillingForm({ ...billingForm, is_suspended: !billingForm.is_suspended })}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${billingForm.is_suspended ? 'bg-red-500' : 'bg-gray-200'}`}
+                      >
+                        <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${billingForm.is_suspended ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
+                      <span className={`text-sm font-semibold ${billingForm.is_suspended ? 'text-red-600' : 'text-gray-400'}`}>
+                        {billingForm.is_suspended ? 'Suspended' : 'Not Suspended'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Subscription End Date</label>
+                    <input
+                      type="datetime-local"
+                      value={billingForm.subscription_end_date}
+                      onChange={e => setBillingForm({ ...billingForm, subscription_end_date: e.target.value })}
+                      className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0e2340]/20 focus:border-[#0e2340] focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Trial End Date</label>
+                    <input
+                      type="datetime-local"
+                      value={billingForm.trial_end_date}
+                      onChange={e => setBillingForm({ ...billingForm, trial_end_date: e.target.value })}
+                      className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0e2340]/20 focus:border-[#0e2340] focus:bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
+                {[
+                  { label: 'Subscription Type', value: <span className="capitalize">{firm.subscription_type}</span> },
+                  { label: 'Subscription Status', value: firm.subscription_status ?? '—' },
+                  { label: 'Subscription End Date', value: formatDateFull(firm.subscription_end_date) },
+                  { label: 'Trial End Date', value: formatDateFull(firm.trial_end_date) },
+                  { label: 'Days Until Expiry', value: firm.days_until_expiry != null ? `${firm.days_until_expiry} days` : '—' },
+                  { label: 'Account Suspended', value: firm.is_suspended ? <span className="text-red-600 font-bold">Yes</span> : <span className="text-emerald-600 font-bold">No</span> },
+                ].map((row, i) => (
+                  <div key={i} className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                    <span className="text-sm font-semibold text-gray-400">{row.label}</span>
+                    <span className="text-sm text-gray-900">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Renew Subscription ── */}
+          <div className="bg-gradient-to-br from-[#0e2340] to-[#1a3a5c] rounded-2xl p-6 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
+              <RefreshCw className="w-40 h-40" />
+            </div>
+            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <RefreshCw className="w-4 h-4 text-blue-300" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-blue-300">Renew Subscription</span>
+                </div>
+                <h3 className="text-lg font-bold">Extend this firm's access</h3>
+                <p className="text-sm text-blue-200 mt-1">Manually process a payment and renew the subscription for a defined period.</p>
+              </div>
+              <button
+                onClick={() => { setRenewOpen(true); setRenewMsg(null); }}
+                className="shrink-0 px-5 py-2.5 bg-white text-[#0e2340] text-sm font-bold rounded-xl hover:bg-blue-50 transition-colors shadow-md flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" /> Renew Now
+              </button>
+            </div>
+          </div>
+
+          {/* ── Branch Limits Info ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h2 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-gray-400" /> Branch Allocation
+            </h2>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              {[
+                { label: 'Branch Limit', value: firm.branch_limit ?? '—' },
+                { label: 'Used', value: firm.current_branch_count ?? 0 },
+                { label: 'Remaining', value: firm.remaining_branches ?? '—' },
+              ].map((item, i) => (
+                <div key={i} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                  <p className="text-2xl font-extrabold text-gray-900">{item.value}</p>
+                  <p className="text-xs font-semibold text-gray-400 mt-1">{item.label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4">
+              <div className="flex justify-between text-xs text-gray-400 font-medium mb-1.5">
+                <span>Branch usage</span>
+                <span>{firm.current_branch_count ?? 0} / {firm.branch_limit ?? '?'}</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div
+                  className="bg-[#0e2340] h-2 rounded-full transition-all"
+                  style={{ width: firm.branch_limit ? `${Math.min(100, ((firm.current_branch_count ?? 0) / firm.branch_limit) * 100)}%` : '0%' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Renew Modal ── */}
+          {renewOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7">
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <RefreshCw className="w-5 h-5 text-[#0e2340]" /> Renew Subscription
+                    </h2>
+                    <p className="text-sm text-gray-400 mt-1">Process a manual payment to extend access.</p>
+                  </div>
+                  <button onClick={() => setRenewOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                    <X className="w-5 h-5 text-gray-400" />
+                  </button>
+                </div>
+
+                {renewMsg && (
+                  <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold mb-4 ${renewMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                    {renewMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                    {renewMsg.text}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Select Plan</label>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {SUBSCRIPTION_PLANS.map(plan => (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          onClick={() => setRenewForm({ ...renewForm, plan_id: plan.id })}
+                          className={`flex flex-col items-start p-3.5 rounded-xl border-2 text-left transition-all ${
+                            renewForm.plan_id === plan.id
+                              ? 'border-[#0e2340] bg-[#0e2340]/5'
+                              : 'border-gray-100 bg-gray-50 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full mb-1">
+                            <span className={`text-sm font-bold ${ renewForm.plan_id === plan.id ? 'text-[#0e2340]' : 'text-gray-800' }`}>
+                              {plan.name}
+                            </span>
+                            {renewForm.plan_id === plan.id && (
+                              <span className="w-4 h-4 rounded-full bg-[#0e2340] flex items-center justify-center shrink-0">
+                                <CheckCircle2 className="w-3 h-3 text-white" />
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs font-semibold text-gray-500">
+                            {plan.price}{plan.period ? ` / ${plan.period}` : ''}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Duration (Months)</label>
+                    <input
+                      type="number"
+                      min={1} max={36}
+                      value={renewForm.duration_months}
+                      onChange={e => setRenewForm({ ...renewForm, duration_months: Math.max(1, parseInt(e.target.value) || 1) })}
+                      className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0e2340]/20 focus:border-[#0e2340] focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-6 pt-5 border-t border-gray-100">
+                  <button
+                    onClick={() => setRenewOpen(false)}
+                    className="flex-1 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRenew}
+                    disabled={renewing || !renewForm.plan_id.trim()}
+                    className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#0e2340] rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {renewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    {renewing ? 'Processing…' : 'Confirm Renewal'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+
       ) : activeTab === 'Settings' ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 max-w-2xl">
           <div className="mb-6 border-b border-gray-100 pb-4">
