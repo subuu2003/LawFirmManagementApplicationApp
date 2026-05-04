@@ -367,10 +367,7 @@ class DashboardViewSet(viewsets.ViewSet):
     
     def get_advocate_stats(self, user, firm):
         """Advocate sees stats for their assigned clients and cases"""
-        if not firm:
-            return {'error': 'User not associated with a firm'}
-        
-        # Cases assigned to this advocate
+        # Cases assigned to this advocate (works for both solo and firm advocates)
         my_cases = Case.objects.filter(assigned_advocate=user) if Case else Case.objects.none()
         
         # Clients assigned to this advocate
@@ -384,6 +381,8 @@ class DashboardViewSet(viewsets.ViewSet):
         
         # My tasks
         my_tasks = Task.objects.filter(assigned_to=user) if Task else Task.objects.none()
+        
+        firm_info = {'id': str(firm.id), 'name': firm.firm_name} if firm else {'id': None, 'name': 'Solo Practice'}
         
         return {
             'cards': {
@@ -402,10 +401,7 @@ class DashboardViewSet(viewsets.ViewSet):
                     next_hearing_date__lte=timezone.now() + timezone.timedelta(days=7)
                 ).count(),
             },
-            'firm_info': {
-                'id': str(firm.id),
-                'name': firm.firm_name,
-            },
+            'firm_info': firm_info,
             'recent_cases': list(my_cases.order_by('-updated_at')[:5].values(
                 'id', 'case_title', 'case_number', 'status', 'next_hearing_date', 'updated_at'
             )),
@@ -416,10 +412,7 @@ class DashboardViewSet(viewsets.ViewSet):
     
     def get_paralegal_stats(self, user, firm):
         """Paralegal sees stats for their assigned cases"""
-        if not firm:
-            return {'error': 'User not associated with a firm'}
-        
-        # Cases assigned to this paralegal
+        # Cases assigned to this paralegal (works for both solo and firm)
         my_cases = Case.objects.filter(assigned_paralegal=user) if Case else Case.objects.none()
         
         # My tasks
@@ -430,6 +423,8 @@ class DashboardViewSet(viewsets.ViewSet):
             uploaded_by=user,
             is_deleted=False
         )
+        
+        firm_info = {'id': str(firm.id), 'name': firm.firm_name} if firm else {'id': None, 'name': 'Solo Practice'}
         
         return {
             'cards': {
@@ -443,10 +438,7 @@ class DashboardViewSet(viewsets.ViewSet):
                     due_date__lt=timezone.now()
                 ).count(),
             },
-            'firm_info': {
-                'id': str(firm.id),
-                'name': firm.firm_name,
-            },
+            'firm_info': firm_info,
             'recent_cases': list(my_cases.order_by('-updated_at')[:5].values(
                 'id', 'case_title', 'case_number', 'status', 'updated_at'
             ))

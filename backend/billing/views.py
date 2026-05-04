@@ -509,10 +509,41 @@ class AdvocateInvoiceViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        if self.request.user.user_type != 'advocate':
-            raise PermissionDenied('Only advocates can create advocate invoices')
+        user = self.request.user
 
-        firm = self.request.user.firm
+        # Platform owner can create invoices for any advocate
+        if user.user_type == 'platform_owner':
+            from accounts.models import CustomUser
+            advocate_id = self.request.data.get('advocate')
+            if not advocate_id:
+                raise PermissionDenied('advocate field is required when platform_owner creates an advocate invoice')
+            try:
+                advocate = CustomUser.objects.get(id=advocate_id, user_type='advocate')
+            except CustomUser.DoesNotExist:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({'advocate': 'Advocate not found'})
+            firm = advocate.firm
+            invoice_number = self.request.data.get('invoice_number', '').strip()
+            if not invoice_number:
+                last_invoice = AdvocateInvoice.objects.filter(firm=firm).order_by('-created_at').first()
+                if last_invoice and last_invoice.invoice_number:
+                    try:
+                        last_num = int(last_invoice.invoice_number.split('-')[-1])
+                        invoice_number = f"ADV-{last_num + 1:05d}"
+                    except:
+                        invoice_number = f"ADV-{AdvocateInvoice.objects.count() + 1:05d}"
+                else:
+                    invoice_number = f"ADV-{AdvocateInvoice.objects.count() + 1:05d}"
+            if AdvocateInvoice.objects.filter(invoice_number=invoice_number).exists():
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({'invoice_number': f'Invoice number "{invoice_number}" already exists.'})
+            serializer.save(firm=firm, advocate=advocate, invoice_number=invoice_number)
+            return
+
+        if user.user_type != 'advocate':
+            raise PermissionDenied('Only advocates or platform owners can create advocate invoices')
+
+        firm = user.firm
 
         # Use provided invoice_number or auto-generate
         invoice_number = self.request.data.get('invoice_number', '').strip()
@@ -531,7 +562,7 @@ class AdvocateInvoiceViewSet(viewsets.ModelViewSet):
             from rest_framework.exceptions import ValidationError
             raise ValidationError({'invoice_number': f'Invoice number "{invoice_number}" already exists.'})
 
-        serializer.save(firm=firm, advocate=self.request.user, invoice_number=invoice_number)
+        serializer.save(firm=firm, advocate=user, invoice_number=invoice_number)
     
     def perform_update(self, serializer):
         instance = self.get_object()
