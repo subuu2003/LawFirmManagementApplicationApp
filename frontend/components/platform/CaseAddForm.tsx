@@ -40,7 +40,7 @@ const MANDATORY_FIELDS = {
   case_type: true,
   client: true,
   assigned_advocate: true,
-  branch: true,
+  branch: false, // optional for solo advocates
 };
 
 const STEPS = [
@@ -149,8 +149,14 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
     const fetchData = async () => {
       try {
         setFetchingData(true);
+
+        // Advocates see only their own clients; others see all
+        const clientsUrl = isAdvocate
+          ? API.CLIENTS.MY_CLIENTS
+          : `${API.USERS.LIST}?user_type=client`;
+
         const [clientsRes, advocatesRes, paralegalsRes, branchesRes] = await Promise.all([
-          customFetch(`${API.USERS.LIST}?user_type=client`),
+          customFetch(clientsUrl),
           customFetch(`${API.USERS.LIST}?user_type=advocate`),
           customFetch(`${API.USERS.LIST}?user_type=paralegal`),
           customFetch(API.FIRMS.BRANCHES.LIST)
@@ -163,17 +169,29 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
           branchesRes.json()
         ]);
 
-        const format = (list: any) =>
+        const formatUser = (list: any) =>
           (list.results || list).map((item: any) => ({
             value: item.id || item.uuid,
             label: optionLabel(item)
           }));
 
+        // my-clients returns Client records with user_account nested
+        const formatClients = (list: any) => {
+          const arr = list.results || list;
+          return arr.map((item: any) => {
+            const name = [item.first_name, item.last_name].filter(Boolean).join(' ').trim()
+              || item.user_account?.first_name + ' ' + item.user_account?.last_name
+              || item.email || 'Unknown';
+            const id = item.user_account?.id || item.id;
+            return { value: id, label: name };
+          });
+        };
+
         setOptions({
-          clients: format(clientsData),
-          advocates: format(advocatesData),
-          paralegals: format(paralegalsData),
-          branches: format(branchesData)
+          clients: isAdvocate ? formatClients(clientsData) : formatUser(clientsData),
+          advocates: formatUser(advocatesData),
+          paralegals: formatUser(paralegalsData),
+          branches: formatUser(branchesData)
         });
       } catch (err: any) {
         console.error("Fetch error:", err);
@@ -182,8 +200,9 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
         setFetchingData(false);
       }
     };
-    fetchData();
-  }, []);
+    // Wait until we know if user is advocate
+    if (currentUser !== null) fetchData();
+  }, [currentUser, isAdvocate]);
 
   const set = (key: string, val: any) => {
     setForm(p => ({ ...p, [key]: val }));
@@ -214,7 +233,8 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
         setError("Assigned Advocate is required.");
         return;
       }
-      if (!form.branch) {
+      // Branch is only required for firm advocates (who have branches)
+      if (!isAdvocate && !form.branch && options.branches.length > 0) {
         setError("Branch is required.");
         return;
       }
@@ -550,12 +570,12 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                   </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
+                  {options.branches.length > 0 && (
                   <div className="flex flex-col gap-1.5">
-                    <FieldLabel required={MANDATORY_FIELDS.branch}>Branch</FieldLabel>
+                    <FieldLabel>Branch</FieldLabel>
                     <div className="relative group">
                       <Store className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <select
-                        required
                         value={form.branch}
                         onChange={e => set('branch', e.target.value)}
                         className="h-11 w-full appearance-none rounded-xl border border-gray-100 bg-gray-50/50 pl-11 pr-10 text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-[#0e2340] transition-all"
@@ -566,6 +586,7 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                     </div>
                   </div>
+                  )}
                 </div>
               </div>
             </Panel>

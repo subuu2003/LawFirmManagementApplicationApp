@@ -11,20 +11,28 @@ import {
   Scale, LayoutDashboard, Building2, BarChart3,
   Settings, ChevronRight, LogOut, Users,
   TrendingUp, ChevronDown, UserCheck, CreditCard,
-  ShieldCheck, X
+  ShieldCheck, X, IndianRupee, FileText, Receipt
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTopbar } from '@/components/platform/TopbarContext';
 
 const userSubItems = [
   { label: 'Firm Owner', path: '/platform-owner/users/super-admin', icon: ShieldCheck },
+  { label: 'Advocates', path: '/platform-owner/users/advocates', icon: UserCheck },
+  { label: 'Clients', path: '/platform-owner/users/clients', icon: Users },
   { label: 'Partner Managers', path: '/platform-owner/partners', icon: UserCheck },
   { label: 'Sales Persons', path: '/platform-owner/sales', icon: TrendingUp },
 ];
 
 const navItems = [
   { label: 'Dashboard', path: '/platform-owner', icon: LayoutDashboard },
-  { label: 'Billing', path: '/platform-owner/billing', icon: CreditCard },
+];
+
+const financeSubItems = [
+  { label: 'Overview', path: '/platform-owner/finance', icon: IndianRupee },
+  { label: 'Platform Invoices', path: '/platform-owner/finance/platform-invoices', icon: Receipt },
+  { label: 'Client Invoices', path: '/platform-owner/finance/invoices', icon: FileText },
+  { label: 'Subscriptions', path: '/platform-owner/finance/subscriptions', icon: CreditCard },
 ];
 
 export default function Sidebar() {
@@ -34,15 +42,26 @@ export default function Sidebar() {
 
   const [userMenuOpen, setUserMenuOpen] = useState(
     () => pathname.startsWith('/platform-owner/users/super-admin') ||
+      pathname.startsWith('/platform-owner/users/advocates') ||
+      pathname.startsWith('/platform-owner/users/clients') ||
       pathname.startsWith('/platform-owner/partners') ||
       pathname.startsWith('/platform-owner/sales')
   );
 
+  const [financeMenuOpen, setFinanceMenuOpen] = useState(
+    () => pathname.startsWith('/platform-owner/finance') || pathname.startsWith('/platform-owner/billing')
+  );
+
   useEffect(() => {
     if (pathname.startsWith('/platform-owner/users/super-admin') ||
+      pathname.startsWith('/platform-owner/users/advocates') ||
+      pathname.startsWith('/platform-owner/users/clients') ||
       pathname.startsWith('/platform-owner/partners') ||
       pathname.startsWith('/platform-owner/sales')) {
       setUserMenuOpen(true);
+    }
+    if (pathname.startsWith('/platform-owner/finance') || pathname.startsWith('/platform-owner/billing')) {
+      setFinanceMenuOpen(true);
     }
   }, [pathname]);
 
@@ -183,22 +202,48 @@ export default function Sidebar() {
           );
         })()}
 
-        {/* Analytics, Billing, Settings */}
-        {navItems.slice(1).map(({ label, path, icon: Icon }) => {
-          const active = isActive(path);
+        {/* Finance — collapsible */}
+        {(() => {
+          const financeSectionActive = pathname.startsWith('/platform-owner/finance') || pathname.startsWith('/platform-owner/billing');
           return (
-            <Link key={path} href={path} onClick={closeSidebar}>
-              <div className={navRow(active)}>
-                {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-r-full bg-[#071526]" />}
+            <div>
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); setFinanceMenuOpen((o) => !o); }}
+                className={navRow(financeSectionActive) + ' w-full'}
+              >
+                {financeSectionActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-r-full bg-[#071526]" />
+                )}
                 <div className="flex items-center gap-3">
-                  <div className={iconBox(active)}><Icon className={iconColor(active)} /></div>
-                  <span className="text-sm font-semibold">{label}</span>
+                  <div className={iconBox(financeSectionActive)}>
+                    <IndianRupee className={iconColor(financeSectionActive)} />
+                  </div>
+                  <span className="text-sm font-semibold">Finance</span>
                 </div>
-                {active && <ChevronRight className="w-3.5 h-3.5 text-[#071526]/40" />}
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${financeMenuOpen ? 'rotate-180 text-[#071526]' : 'text-gray-500'}`} />
+              </button>
+              <div className={`overflow-hidden transition-all duration-300 ease-in-out ${financeMenuOpen ? 'max-h-56 opacity-100' : 'max-h-0 opacity-0'}`}>
+                <div className="ml-[22px] mt-1 mb-1 border-l-2 border-[#071526]/15 pl-3.5 space-y-0.5">
+                  {financeSubItems.map(({ label, path, icon: Icon }) => {
+                    const active = path === '/platform-owner/finance'
+                      ? pathname === '/platform-owner/finance'
+                      : pathname.startsWith(path);
+                    return (
+                      <Link key={path} href={path} onClick={closeSidebar}>
+                        <div className={`group flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer ${active ? 'bg-[#071526]/8 text-[#071526]' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-950'}`}>
+                          <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-[#071526]' : 'text-gray-600 group-hover:text-gray-900'}`} />
+                          <span className={`text-[13px] font-semibold ${active ? 'text-[#071526]' : ''}`}>{label}</span>
+                          {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#071526]" />}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
-            </Link>
+            </div>
           );
-        })}
+        })()}
 
         {(isActive('/platform-owner/profile') || isActive('/platform-owner/settings')) && (
           <>
