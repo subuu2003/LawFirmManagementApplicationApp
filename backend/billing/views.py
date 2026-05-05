@@ -205,15 +205,21 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         # Use provided invoice_number or auto-generate
         invoice_number = self.request.data.get('invoice_number', '').strip()
         if not invoice_number:
-            last_invoice = Invoice.objects.filter(firm=firm).order_by('-created_at').first()
-            if last_invoice and last_invoice.invoice_number:
-                try:
-                    last_num = int(last_invoice.invoice_number.split('-')[-1])
-                    invoice_number = f"INV-{firm.firm_code}-{last_num + 1:05d}"
-                except:
+            if firm:
+                last_invoice = Invoice.objects.filter(firm=firm).order_by('-created_at').first()
+                if last_invoice and last_invoice.invoice_number:
+                    try:
+                        last_num = int(last_invoice.invoice_number.split('-')[-1])
+                        invoice_number = f"INV-{firm.firm_code}-{last_num + 1:05d}"
+                    except Exception:
+                        invoice_number = f"INV-{firm.firm_code}-00001"
+                else:
                     invoice_number = f"INV-{firm.firm_code}-00001"
             else:
-                invoice_number = f"INV-{firm.firm_code}-00001"
+                # Solo client — no firm code available, use timestamp-based number
+                from django.utils import timezone as tz
+                seq = Invoice.objects.count() + 1
+                invoice_number = f"INV-SOLO-{seq:05d}"
 
         # Check uniqueness
         if Invoice.objects.filter(invoice_number=invoice_number).exists():

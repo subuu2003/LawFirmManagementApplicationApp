@@ -28,7 +28,7 @@ class TimeEntry(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    firm = models.ForeignKey('firms.Firm', on_delete=models.CASCADE, related_name='time_entries')
+    firm = models.ForeignKey('firms.Firm', on_delete=models.CASCADE, related_name='time_entries', null=True, blank=True)
     case = models.ForeignKey('cases.Case', on_delete=models.CASCADE, related_name='time_entries', null=True, blank=True)
     user = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='time_entries')
     
@@ -94,7 +94,7 @@ class Expense(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    firm = models.ForeignKey('firms.Firm', on_delete=models.CASCADE, related_name='expenses')
+    firm = models.ForeignKey('firms.Firm', on_delete=models.CASCADE, related_name='expenses', null=True, blank=True)
     case = models.ForeignKey('cases.Case', on_delete=models.CASCADE, related_name='expenses', null=True, blank=True)
     submitted_by = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='submitted_expenses')
     
