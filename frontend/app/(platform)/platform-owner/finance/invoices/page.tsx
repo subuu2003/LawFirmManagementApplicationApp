@@ -17,24 +17,18 @@ export default function PlatformOwnerInvoicesPage() {
   useTopbarTitle('Client Invoices', 'Create and manage invoices for solo advocates and clients.');
 
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [advocateInvoices, setAdvocateInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [count, setCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'full' | 'split'>('full');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'client' | 'advocate'>('client');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'overdue' | 'unpaid' | 'paid'>('all');
   const [filterOpen, setFilterOpen] = useState(false);
-
-  useEffect(() => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user_details') || '{}');
-      setCurrentUserId(user.id || user.user_id || null);
-    } catch {}
-  }, []);
 
   const fetchInvoices = async (page = 1, filter: string = activeFilter) => {
     setLoading(true);
@@ -52,16 +46,9 @@ export default function PlatformOwnerInvoicesPage() {
       const res = await customFetch(url);
       if (res.ok) {
         const data = await res.json();
-        let results = Array.isArray(data) ? data : (data.results || []);
-        // Only show invoices created by this platform owner
-        const userId = currentUserId || JSON.parse(localStorage.getItem('user_details') || '{}').id;
-        if (userId) {
-          results = results.filter((inv: any) =>
-            inv.created_by === userId || inv.created_by_id === userId
-          );
-        }
+        const results = Array.isArray(data) ? data : (data.results || []);
         setInvoices(results);
-        setCount(results.length);
+        setCount(data.count || results.length);
       }
     } catch (err) {
       console.error('Failed to fetch invoices', err);
@@ -88,14 +75,28 @@ export default function PlatformOwnerInvoicesPage() {
 
   useEffect(() => {
     fetchInvoices(currentPage, activeFilter);
-  }, [currentPage, activeFilter, currentUserId]);
+    fetchAdvocateInvoices();
+  }, [currentPage, activeFilter]);
 
-  const displayedInvoices = invoices.filter(inv => {
+  const fetchAdvocateInvoices = async () => {
+    try {
+      const res = await customFetch(API.BILLING.ADVOCATE_INVOICES.LIST);
+      if (res.ok) {
+        const data = await res.json();
+        setAdvocateInvoices(Array.isArray(data) ? data : (data.results || []));
+      }
+    } catch (err) {
+      console.error('Failed to fetch advocate invoices', err);
+    }
+  };
+
+  const displayedInvoices = (activeTab === 'client' ? invoices : advocateInvoices).filter(inv => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
       inv.invoice_number?.toLowerCase().includes(q) ||
-      inv.client_name?.toLowerCase().includes(q)
+      inv.client_name?.toLowerCase().includes(q) ||
+      inv.advocate_name?.toLowerCase().includes(q)
     );
   });
 
@@ -161,8 +162,18 @@ export default function PlatformOwnerInvoicesPage() {
         <div className="w-full max-w-[1600px] mx-auto h-[calc(100vh-120px)] flex flex-col">
           <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-3 px-2 pt-4">
             <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Client Invoices</h2>
-              <p className="text-sm font-semibold text-slate-400">Invoices for solo advocates and clients</p>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Invoices</h2>
+              <p className="text-sm font-semibold text-slate-400">Client & advocate invoices</p>
+              <div className="flex gap-2 mt-3">
+                <button onClick={() => setActiveTab('client')}
+                  className={`px-4 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'client' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+                  Client Invoices ({invoices.length})
+                </button>
+                <button onClick={() => setActiveTab('advocate')}
+                  className={`px-4 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'advocate' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+                  Advocate Invoices ({advocateInvoices.length})
+                </button>
+              </div>
             </div>
             <Link
               href="/platform-owner/finance/invoices/new"
@@ -253,7 +264,7 @@ export default function PlatformOwnerInvoicesPage() {
                     <tr className="bg-slate-50 border-b border-slate-200">
                       <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
                       <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Invoice #</th>
-                      <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Client</th>
+                      <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">{activeTab === 'advocate' ? 'Advocate' : 'Client'}</th>
                       <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Amount</th>
                       <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Status</th>
                       <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
@@ -280,7 +291,9 @@ export default function PlatformOwnerInvoicesPage() {
                           {inv.due_date && <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Due: {new Date(inv.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>}
                         </td>
                         <td className="py-4 px-6 text-sm font-bold text-slate-900">{inv.invoice_number}</td>
-                        <td className="py-4 px-6 text-sm font-bold text-slate-700 max-w-[200px] truncate">{inv.client_name}</td>
+                        <td className="py-4 px-6 text-sm font-bold text-slate-700 max-w-[200px] truncate">
+                          {activeTab === 'advocate' ? inv.advocate_name : inv.client_name}
+                        </td>
                         <td className="py-4 px-6 text-sm font-black text-slate-900 text-right">₹{parseFloat(inv.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         <td className="py-3 px-6">
                           <span className={`text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center justify-center w-24 uppercase tracking-wider ${getStatusStyle(inv.status)}`}>
