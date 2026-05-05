@@ -964,12 +964,12 @@ class FinanceOverviewViewSet(viewsets.ViewSet):
                 ).order_by('due_date')[:10]
             ]
 
-            # 9. Recent invoices — platform invoices only
-            recent_invoices_data = [
+            # 9. Recent invoices — platform + client invoices merged
+            recent_platform_list = [
                 {
                     'invoice_id': str(inv.id),
                     'invoice_number': inv.invoice_number,
-                    'client_name': inv.firm.firm_name,
+                    'client_name': inv.firm.firm_name if inv.firm else 'Solo',
                     'invoice_type': 'platform',
                     'amount': float(inv.total_amount),
                     'invoice_date': inv.invoice_date.isoformat(),
@@ -977,8 +977,41 @@ class FinanceOverviewViewSet(viewsets.ViewSet):
                 }
                 for inv in platform_invoices.order_by('-invoice_date')[:10]
             ]
+            recent_client_list = [
+                {
+                    'invoice_id': str(inv.id),
+                    'invoice_number': inv.invoice_number,
+                    'client_name': inv.client.get_full_name() if hasattr(inv.client, 'get_full_name') else str(inv.client),
+                    'invoice_type': 'client',
+                    'amount': float(inv.total_amount),
+                    'invoice_date': inv.invoice_date.isoformat(),
+                    'status': inv.status
+                }
+                for inv in invoices.order_by('-invoice_date')[:10]
+            ]
+            recent_advocate_list = [
+                {
+                    'invoice_id': str(inv.id),
+                    'invoice_number': inv.invoice_number,
+                    'client_name': inv.advocate.get_full_name(),
+                    'invoice_type': 'advocate',
+                    'amount': float(inv.total_amount),
+                    'invoice_date': inv.invoice_date.isoformat(),
+                    'status': inv.status
+                }
+                for inv in advocate_invoices.order_by('-invoice_date')[:10]
+            ]
+            all_recent = sorted(
+                recent_platform_list + recent_client_list + recent_advocate_list,
+                key=lambda x: x['invoice_date'], reverse=True
+            )
+            recent_invoices_data = all_recent[:10]
 
-            # 10. Invoice stats — platform only
+            # 10. Invoice stats — all types
+            client_paid_amount = float(invoices.filter(status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
+            client_pending_amount = float(invoices.filter(
+                status__in=['sent', 'viewed', 'partially_paid', 'overdue']
+            ).aggregate(t=Sum('balance_due'))['t'] or 0)
             invoice_stats = {
                 'platform': {
                     'total': platform_invoices.count(),
@@ -988,7 +1021,14 @@ class FinanceOverviewViewSet(viewsets.ViewSet):
                     'pending_amount': float(pending_invoices_amount),
                     'draft': platform_invoices.filter(status='draft').count(),
                 },
-                'client': {'total': 0, 'paid': 0, 'paid_amount': 0, 'pending': 0, 'pending_amount': 0, 'draft': 0},
+                'client': {
+                    'total': invoices.count(),
+                    'paid': invoices.filter(status='paid').count(),
+                    'paid_amount': client_paid_amount,
+                    'pending': invoices.filter(status__in=['sent', 'viewed', 'partially_paid', 'overdue']).count(),
+                    'pending_amount': client_pending_amount,
+                    'draft': invoices.filter(status='draft').count(),
+                },
                 'advocate': {
                     'total': advocate_invoices.count(),
                     'paid': advocate_invoices.filter(status='paid').count(),

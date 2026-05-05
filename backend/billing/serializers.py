@@ -288,10 +288,19 @@ class AdvocateInvoiceSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'firm', 'advocate', 'subtotal', 'tax_amount', 'total_amount',
+            'id', 'firm', 'advocate', 'tax_amount', 'total_amount',
             'approved_by', 'approved_date', 'paid_date',
             'created_at', 'updated_at'
         ]
+
+    def create(self, validated_data):
+        """Calculate amounts from subtotal + tax_percentage on create"""
+        subtotal = validated_data.get('subtotal', Decimal('0')) or Decimal('0')
+        tax_pct = validated_data.get('tax_percentage', Decimal('0')) or Decimal('0')
+        tax_amount = subtotal * (tax_pct / Decimal('100'))
+        validated_data['tax_amount'] = tax_amount
+        validated_data['total_amount'] = subtotal + tax_amount
+        return super().create(validated_data)
     
     def validate(self, data):
         """Validate advocate invoice data"""

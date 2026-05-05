@@ -268,6 +268,7 @@ export default function CreateInvoicePage() {
         fd.append('internal_notes', internalNotes);
         fd.append('terms_and_conditions', termsAndConditions);
         if (isEditMode) fd.append('status', invoiceStatus);
+        else fd.append('status', 'sent');
         fd.append('pdf_file', pdfFile);
         body = fd;
       } else {
@@ -311,6 +312,7 @@ export default function CreateInvoicePage() {
               .map((item) => ({ description: item.description, amount: item.amount, expense_type: 'other' })),
           };
           if (isEditMode) payload.status = invoiceStatus;
+          else payload.status = 'sent'; // new invoices default to sent
           body = JSON.stringify(payload);
         }
       }
