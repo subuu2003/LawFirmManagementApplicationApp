@@ -144,7 +144,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        queryset = Invoice.objects.all()
         
         if user.user_type == 'platform_owner':
             queryset = Invoice.objects.all()
@@ -161,6 +160,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             client_profile = getattr(user, 'client_profile', None)
             if client_profile:
                 queryset = Invoice.objects.filter(client=client_profile)
+            else:
+                queryset = Invoice.objects.none()
         else:
             queryset = Invoice.objects.none()
         
