@@ -235,6 +235,19 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             username=validated_data['email']
         )
         
+        # Create Client record for self-registered clients
+        if user_type == 'client':
+            from clients.models import Client
+            Client.objects.create(
+                firm=firm,  # Will be None for solo clients
+                first_name=user.first_name,
+                last_name=user.last_name,
+                email=user.email,
+                phone_number=user.phone_number,
+                address=f"{validated_data.get('address_line_1', '')} {validated_data.get('address_line_2', '')}".strip(),
+                user_account=user
+            )
+        
         # Create UserFirmRole mapping if firm was created
         if firm:
             branch = None
