@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, AlertCircle } from 'lucide-react';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 
@@ -13,6 +13,7 @@ export default function AddNewFirmPage() {
   const [fetchingFirm, setFetchingFirm] = useState(true);
   const [firmId, setFirmId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [limitError, setLimitError] = useState<any>(null);
   const [formData, setFormData] = useState({
     branch_name: '',
     branch_code: '',
@@ -56,6 +57,7 @@ export default function AddNewFirmPage() {
 
     setLoading(true);
     setError('');
+    setLimitError(null);
 
     try {
       const response = await customFetch(API.FIRMS.BRANCHES.CREATE, {
@@ -71,7 +73,11 @@ export default function AddNewFirmPage() {
         router.push('/super-admin/my-firms');
       } else {
         const data = await response.json();
-        setError(data.detail || data.message || 'Failed to create branch. Please check the fields.');
+        if (data.error && data.upgrade_message) {
+          setLimitError(data);
+        } else {
+          setError(data.error || data.detail || data.message || 'Failed to create branch. Please check the fields.');
+        }
       }
     } catch (err) {
       setError('A network error occurred.');
@@ -112,8 +118,37 @@ export default function AddNewFirmPage() {
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600">
+            <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-sm font-semibold text-red-600 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
               {error}
+            </div>
+          )}
+
+          {limitError && (
+            <div className="p-5 bg-amber-50 border border-amber-200 rounded-xl">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-amber-100 text-amber-600 rounded-lg shrink-0 mt-0.5">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-amber-900 mb-1">Subscription Limit Reached</h3>
+                  <p className="text-sm font-medium text-amber-800 mb-4 leading-relaxed">{limitError.error}</p>
+                  
+                  <div className="flex items-center flex-wrap gap-4 text-xs font-semibold text-amber-700 bg-amber-100/50 px-4 py-3 rounded-lg mb-4">
+                    <div>Plan: <span className="uppercase font-bold text-amber-900">{limitError.subscription_type}</span></div>
+                    <div className="w-1 h-1 bg-amber-300 rounded-full"></div>
+                    <div>Limit: <span className="font-bold text-amber-900">{limitError.branch_limit}</span></div>
+                    <div className="w-1 h-1 bg-amber-300 rounded-full"></div>
+                    <div>Active: <span className="font-bold text-amber-900">{limitError.current_branches}</span></div>
+                  </div>
+
+                  <p className="text-sm font-medium text-amber-800 mb-4">{limitError.upgrade_message}</p>
+
+                  <Link href="/super-admin/finance/subscriptions" className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 text-white text-sm font-bold rounded-lg hover:bg-amber-700 transition-colors shadow-sm">
+                    Upgrade Subscription
+                  </Link>
+                </div>
+              </div>
             </div>
           )}
 
