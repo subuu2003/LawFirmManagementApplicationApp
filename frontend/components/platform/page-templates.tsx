@@ -26,6 +26,7 @@ import {
   PlusCircle,
   Save,
   ChevronDown,
+  AlertCircle,
 } from 'lucide-react';
 import {
   ActivityFeed,
@@ -1517,6 +1518,7 @@ export function TeamMemberFormPage({
   const [branches, setBranches] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [limitError, setLimitError] = useState<any>(null);
 
   useEffect(() => {
     if (formData.user_type === 'super_admin' || formData.user_type === 'partner_manager') {
@@ -1575,6 +1577,7 @@ export function TeamMemberFormPage({
     e.preventDefault();
     setLoading(true);
     setError('');
+    setLimitError(null);
 
     try {
       const payload = { ...formData };
@@ -1614,6 +1617,10 @@ export function TeamMemberFormPage({
 
       const data = await response.json();
       if (!response.ok) {
+        if (data.error && data.upgrade_message) {
+          setLimitError(data);
+          return;
+        }
         throw new Error(data.error || data.detail || 'Failed to create user');
       }
 
@@ -1635,6 +1642,40 @@ export function TeamMemberFormPage({
         description={description ?? (detail ? 'Role scope, assignment load, and access visibility for an individual user.' : 'Create a new team member with controlled access and full profile initialization.')}
       />
       <form onSubmit={handleSubmit}>
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-lg text-sm font-semibold text-red-600 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5" />
+            {error}
+          </div>
+        )}
+
+        {limitError && (
+          <div className="mb-6 p-5 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-amber-100 text-amber-600 rounded-lg shrink-0 mt-0.5">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-amber-900 mb-1">Subscription Limit Reached</h3>
+                <p className="text-sm font-medium text-amber-800 mb-4 leading-relaxed">{limitError.error}</p>
+                
+                <div className="flex items-center flex-wrap gap-4 text-xs font-semibold text-amber-700 bg-amber-100/50 px-4 py-3 rounded-lg mb-4">
+                  <div>Plan: <span className="uppercase font-bold text-amber-900">{limitError.subscription_type}</span></div>
+                  <div className="w-1 h-1 bg-amber-300 rounded-full"></div>
+                  <div>Limit: <span className="font-bold text-amber-900">{limitError.user_limit || limitError.advocate_limit || limitError.paralegal_limit || limitError.admin_limit || limitError.client_limit || limitError.limit || 'Max Reached'}</span></div>
+                  <div className="w-1 h-1 bg-amber-300 rounded-full"></div>
+                  <div>Active: <span className="font-bold text-amber-900">{limitError.current_users || limitError.current_advocates || limitError.current_paralegals || limitError.current_admins || limitError.current_clients || limitError.current || 'At Limit'}</span></div>
+                </div>
+
+                <p className="text-sm font-medium text-amber-800 mb-4">{limitError.upgrade_message}</p>
+
+                <Link href="/super-admin/finance/subscriptions" className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 text-white text-sm font-bold rounded-lg hover:bg-amber-700 transition-colors shadow-sm">
+                  Upgrade Subscription
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
         <SplitPanels
           left={
             <div className="space-y-6">
