@@ -35,7 +35,7 @@ export interface CalendarEvent {
 interface ProfessionalCalendarProps {
   events: CalendarEvent[];
   isLoading?: boolean;
-  role?: 'admin' | 'advocate' | 'client';
+  role?: string;
   onDateChange?: (date: Date) => void;
   onViewChange?: (view: 'day' | 'week' | 'month') => void;
   onAddEvent?: (date: Date) => void;
