@@ -1418,18 +1418,33 @@ class FinanceOverviewViewSet(viewsets.ViewSet):
 
             monthly = []
             for i, month in enumerate(MONTHS, 1):
-                rev = float(platform_invoices.filter(invoice_date__month=i, status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
-                client_rev = float(client_invoices.filter(invoice_date__month=i, status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
-                exp = float(adv_invoices.filter(invoice_date__month=i, status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
+                # Billed = all non-draft invoices; Collected = paid only
+                pi_month = platform_invoices.filter(invoice_date__month=i)
+                ci_month = client_invoices.filter(invoice_date__month=i)
+                ai_month = adv_invoices.filter(invoice_date__month=i)
+
+                platform_billed = float(pi_month.exclude(status='draft').aggregate(t=Sum('total_amount'))['t'] or 0)
+                platform_collected = float(pi_month.filter(status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
+                client_billed = float(ci_month.exclude(status='draft').aggregate(t=Sum('total_amount'))['t'] or 0)
+                client_collected = float(ci_month.filter(status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
+                exp = float(ai_month.filter(status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
+
+                total_billed = platform_billed + client_billed
+                total_collected = platform_collected + client_collected
+
                 monthly.append({
                     'month': month,
-                    'platform_revenue': rev,
-                    'client_revenue': client_rev,
-                    'total_revenue': rev + client_rev,
+                    'platform_revenue': platform_billed,
+                    'platform_collected': platform_collected,
+                    'client_revenue': client_billed,
+                    'client_collected': client_collected,
+                    'total_revenue': total_billed,
+                    'total_collected': total_collected,
                     'expenses': exp,
-                    'net_profit': rev + client_rev - exp,
-                    'invoice_count': platform_invoices.filter(invoice_date__month=i).count() + client_invoices.filter(invoice_date__month=i).count(),
-                    'paid_count': platform_invoices.filter(invoice_date__month=i, status='paid').count() + client_invoices.filter(invoice_date__month=i, status='paid').count(),
+                    'net_profit': total_collected - exp,
+                    'invoice_count': pi_month.count() + ci_month.count(),
+                    'paid_count': pi_month.filter(status='paid').count() + ci_month.filter(status='paid').count(),
+                    'pending_count': pi_month.filter(status__in=['sent', 'overdue']).count() + ci_month.filter(status__in=['sent', 'viewed', 'overdue', 'partially_paid']).count(),
                 })
 
         else:  # super_admin / admin
@@ -1440,22 +1455,26 @@ class FinanceOverviewViewSet(viewsets.ViewSet):
 
             monthly = []
             for i, month in enumerate(MONTHS, 1):
-                rev = float(inv_qs.filter(invoice_date__month=i, status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
+                inv_month = inv_qs.filter(invoice_date__month=i)
+                billed = float(inv_month.exclude(status='draft').aggregate(t=Sum('total_amount'))['t'] or 0)
+                collected = float(inv_month.filter(status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
                 exp = float(exp_qs.filter(date__month=i).aggregate(t=Sum('amount'))['t'] or 0)
                 adv_exp = float(adv_qs.filter(invoice_date__month=i, status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
                 total_exp = exp + adv_exp
                 monthly.append({
                     'month': month,
-                    'total_revenue': rev,
+                    'total_revenue': billed,
+                    'total_collected': collected,
                     'expenses': total_exp,
-                    'net_profit': rev - total_exp,
-                    'invoice_count': inv_qs.filter(invoice_date__month=i).count(),
-                    'paid_count': inv_qs.filter(invoice_date__month=i, status='paid').count(),
-                    'pending_count': inv_qs.filter(invoice_date__month=i, status__in=['sent', 'overdue', 'partially_paid']).count(),
+                    'net_profit': collected - total_exp,
+                    'invoice_count': inv_month.count(),
+                    'paid_count': inv_month.filter(status='paid').count(),
+                    'pending_count': inv_month.filter(status__in=['sent', 'viewed', 'overdue', 'partially_paid']).count(),
                 })
 
         totals = {
             'total_revenue': sum(m['total_revenue'] for m in monthly),
+            'total_collected': sum(m.get('total_collected', m['total_revenue']) for m in monthly),
             'expenses': sum(m['expenses'] for m in monthly),
             'net_profit': sum(m['net_profit'] for m in monthly),
         }
