@@ -1386,10 +1386,10 @@ class FinanceOverviewViewSet(viewsets.ViewSet):
     def monthly_report(self, request):
         """
         GET /api/billing/finance-overview/monthly_report/?year=2026
-        Returns month-wise financial breakdown for the given year.
-        Gated by enable_reports on the firm's subscription plan.
+        - Billed: invoices with invoice_date in that month
+        - Collected: invoices with payment_date in that month (actual cash received)
+        - Firm breakdown for platform owner
         """
-        from decimal import Decimal
         from subscriptions.models import FirmSubscription, PlatformInvoice
 
         user = request.user
@@ -1400,34 +1400,40 @@ class FinanceOverviewViewSet(viewsets.ViewSet):
                 sub = FirmSubscription.objects.select_related('plan').get(firm=user.firm)
                 if not sub.plan.enable_reports:
                     return Response(
-                        {'error': 'Reports are not available on your current plan. Please upgrade to access this feature.', 'upgrade_required': True},
+                        {'error': 'Reports are not available on your current plan. Upgrade to Business or Enterprise.', 'upgrade_required': True},
                         status=status.HTTP_403_FORBIDDEN
                     )
             except FirmSubscription.DoesNotExist:
                 return Response({'error': 'No active subscription found.', 'upgrade_required': True}, status=status.HTTP_403_FORBIDDEN)
 
         year = int(request.query_params.get('year', timezone.now().year))
-
         MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
         if user.user_type == 'platform_owner':
-            platform_invoices = PlatformInvoice.objects.filter(invoice_date__year=year)
-            adv_invoices = AdvocateInvoice.objects.filter(invoice_date__year=year)
-            client_invoices = Invoice.objects.filter(invoice_date__year=year)
+            # All platform invoices regardless of year for billed/collected split
+            all_pi = PlatformInvoice.objects.select_related('firm', 'subscription_plan')
+            all_ci = Invoice.objects.select_related('firm', 'client')
+            all_ai = AdvocateInvoice.objects.select_related('advocate', 'firm')
 
             monthly = []
             for i, month in enumerate(MONTHS, 1):
-                # Billed = all non-draft invoices; Collected = paid only
-                pi_month = platform_invoices.filter(invoice_date__month=i)
-                ci_month = client_invoices.filter(invoice_date__month=i)
-                ai_month = adv_invoices.filter(invoice_date__month=i)
+                # Billed = invoice_date in this month/year
+                pi_billed = all_pi.filter(invoice_date__year=year, invoice_date__month=i)
+                ci_billed = all_ci.filter(invoice_date__year=year, invoice_date__month=i)
 
-                platform_billed = float(pi_month.exclude(status='draft').aggregate(t=Sum('total_amount'))['t'] or 0)
-                platform_collected = float(pi_month.filter(status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
-                client_billed = float(ci_month.exclude(status='draft').aggregate(t=Sum('total_amount'))['t'] or 0)
-                client_collected = float(ci_month.filter(status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
-                exp = float(ai_month.filter(status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
+                # Collected = payment_date in this month/year (actual cash received)
+                pi_collected = all_pi.filter(status='paid', payment_date__year=year, payment_date__month=i)
+                ci_collected = all_ci.filter(status='paid', invoice_date__year=year, invoice_date__month=i)
+
+                # Expenses = advocate invoices paid this month
+                ai_exp = all_ai.filter(status='paid', invoice_date__year=year, invoice_date__month=i)
+
+                platform_billed = float(pi_billed.exclude(status='draft').aggregate(t=Sum('total_amount'))['t'] or 0)
+                platform_collected = float(pi_collected.aggregate(t=Sum('total_amount'))['t'] or 0)
+                client_billed = float(ci_billed.exclude(status='draft').aggregate(t=Sum('total_amount'))['t'] or 0)
+                client_collected = float(ci_collected.aggregate(t=Sum('total_amount'))['t'] or 0)
+                expenses = float(ai_exp.aggregate(t=Sum('total_amount'))['t'] or 0)
 
                 total_billed = platform_billed + client_billed
                 total_collected = platform_collected + client_collected
@@ -1440,26 +1446,42 @@ class FinanceOverviewViewSet(viewsets.ViewSet):
                     'client_collected': client_collected,
                     'total_revenue': total_billed,
                     'total_collected': total_collected,
-                    'expenses': exp,
-                    'net_profit': total_collected - exp,
-                    'invoice_count': pi_month.count() + ci_month.count(),
-                    'paid_count': pi_month.filter(status='paid').count() + ci_month.filter(status='paid').count(),
-                    'pending_count': pi_month.filter(status__in=['sent', 'overdue']).count() + ci_month.filter(status__in=['sent', 'viewed', 'overdue', 'partially_paid']).count(),
+                    'expenses': expenses,
+                    'net_profit': total_collected - expenses,
+                    'invoice_count': pi_billed.count() + ci_billed.count(),
+                    'paid_count': pi_collected.count() + ci_collected.count(),
+                    'pending_count': pi_billed.filter(status__in=['sent', 'overdue']).count() + ci_billed.filter(status__in=['sent', 'viewed', 'overdue', 'partially_paid']).count(),
+                })
+
+            # Firm breakdown — who paid, who is pending
+            firm_breakdown = []
+            for pi in all_pi.filter(invoice_date__year=year).exclude(status='draft').order_by('firm__firm_name', 'invoice_date'):
+                firm_breakdown.append({
+                    'firm_name': pi.firm.firm_name if pi.firm else '—',
+                    'invoice_number': pi.invoice_number,
+                    'invoice_date': pi.invoice_date.isoformat(),
+                    'due_date': pi.due_date.isoformat(),
+                    'plan': pi.subscription_plan.name if pi.subscription_plan else '—',
+                    'total_amount': float(pi.total_amount),
+                    'paid_amount': float(pi.paid_amount),
+                    'balance_due': float(pi.balance_due),
+                    'status': pi.status,
+                    'payment_date': pi.payment_date.isoformat() if pi.payment_date else None,
                 })
 
         else:  # super_admin / admin
             firm = user.firm
-            inv_qs = Invoice.objects.filter(firm=firm, invoice_date__year=year)
-            exp_qs = Expense.objects.filter(firm=firm, date__year=year)
-            adv_qs = AdvocateInvoice.objects.filter(firm=firm, invoice_date__year=year)
+            inv_qs = Invoice.objects.filter(firm=firm)
+            exp_qs = Expense.objects.filter(firm=firm)
+            adv_qs = AdvocateInvoice.objects.filter(firm=firm)
 
             monthly = []
             for i, month in enumerate(MONTHS, 1):
-                inv_month = inv_qs.filter(invoice_date__month=i)
+                inv_month = inv_qs.filter(invoice_date__year=year, invoice_date__month=i)
                 billed = float(inv_month.exclude(status='draft').aggregate(t=Sum('total_amount'))['t'] or 0)
-                collected = float(inv_month.filter(status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
-                exp = float(exp_qs.filter(date__month=i).aggregate(t=Sum('amount'))['t'] or 0)
-                adv_exp = float(adv_qs.filter(invoice_date__month=i, status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
+                collected = float(inv_month.filter(status='paid').aggregate(t=Sum('paid_amount'))['t'] or 0)
+                exp = float(exp_qs.filter(date__year=year, date__month=i).aggregate(t=Sum('amount'))['t'] or 0)
+                adv_exp = float(adv_qs.filter(invoice_date__year=year, invoice_date__month=i, status='paid').aggregate(t=Sum('total_amount'))['t'] or 0)
                 total_exp = exp + adv_exp
                 monthly.append({
                     'month': month,
@@ -1471,12 +1493,18 @@ class FinanceOverviewViewSet(viewsets.ViewSet):
                     'paid_count': inv_month.filter(status='paid').count(),
                     'pending_count': inv_month.filter(status__in=['sent', 'viewed', 'overdue', 'partially_paid']).count(),
                 })
+            firm_breakdown = []
 
         totals = {
             'total_revenue': sum(m['total_revenue'] for m in monthly),
-            'total_collected': sum(m.get('total_collected', m['total_revenue']) for m in monthly),
+            'total_collected': sum(m.get('total_collected', 0) for m in monthly),
             'expenses': sum(m['expenses'] for m in monthly),
             'net_profit': sum(m['net_profit'] for m in monthly),
         }
 
-        return Response({'year': year, 'monthly': monthly, 'totals': totals})
+        return Response({
+            'year': year,
+            'monthly': monthly,
+            'totals': totals,
+            'firm_breakdown': firm_breakdown,
+        })
