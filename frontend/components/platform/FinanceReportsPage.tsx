@@ -110,13 +110,13 @@ export default function FinanceReportsPage({ role }: Props) {
 
   // Summary cards
   const cards = [
-    { label: 'Total Revenue', value: fmtFull(totals.total_revenue), icon: IndianRupee, color: 'bg-blue-50 text-blue-600' },
+    { label: 'Total Billed', value: fmtFull(totals.total_revenue), icon: FileText, color: 'bg-blue-50 text-blue-600' },
+    { label: 'Total Collected', value: fmtFull(totals.total_collected ?? totals.total_revenue), icon: IndianRupee, color: 'bg-emerald-50 text-emerald-600' },
     { label: 'Total Expenses', value: fmtFull(totals.expenses), icon: CreditCard, color: 'bg-red-50 text-red-500' },
-    { label: 'Net Profit', value: fmtFull(totals.net_profit), icon: Activity, color: 'bg-emerald-50 text-emerald-600' },
     {
-      label: 'Profit Margin',
-      value: totals.total_revenue > 0 ? `${((totals.net_profit / totals.total_revenue) * 100).toFixed(1)}%` : '—',
-      icon: TrendingUp,
+      label: 'Net Profit',
+      value: fmtFull(totals.net_profit),
+      icon: totals.net_profit >= 0 ? TrendingUp : TrendingDown,
       color: totals.net_profit >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500',
     },
   ];
@@ -215,8 +215,9 @@ export default function FinanceReportsPage({ role }: Props) {
                   formatter={(value: any, name: string) => [fmtFull(Number(value)), name]}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: 600, paddingTop: '16px' }} />
-                <Bar dataKey="total_revenue" name="Revenue" fill="#2563EB" radius={[4, 4, 0, 0]} />
-                {isPlatformOwner && <Bar dataKey="client_revenue" name="Client Revenue" fill="#7C3AED" radius={[4, 4, 0, 0]} />}
+                <Bar dataKey="total_revenue" name="Billed" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="total_collected" name="Collected" fill="#10B981" radius={[4, 4, 0, 0]} />
+                {isPlatformOwner && <Bar dataKey="client_revenue" name="Client Billed" fill="#7C3AED" radius={[4, 4, 0, 0]} />}
                 <Bar dataKey="expenses" name="Expenses" fill="#94A3B8" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -254,23 +255,26 @@ export default function FinanceReportsPage({ role }: Props) {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                   <th className="px-6 py-3">Month</th>
-                  <th className="px-4 py-3 text-right">Revenue</th>
-                  {isPlatformOwner && <th className="px-4 py-3 text-right">Client Rev.</th>}
+                  <th className="px-4 py-3 text-right">Billed</th>
+                  <th className="px-4 py-3 text-right">Collected</th>
+                  {isPlatformOwner && <th className="px-4 py-3 text-right">Client Billed</th>}
                   <th className="px-4 py-3 text-right">Expenses</th>
                   <th className="px-4 py-3 text-right">Net Profit</th>
                   <th className="px-4 py-3 text-right">Invoices</th>
                   <th className="px-4 py-3 text-right">Paid</th>
-                  {!isPlatformOwner && <th className="px-4 py-3 text-right">Pending</th>}
+                  <th className="px-4 py-3 text-right">Pending</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {monthly.map((m: any, i: number) => {
                   const isProfit = m.net_profit >= 0;
                   const hasData = m.total_revenue > 0 || m.expenses > 0;
+                  const collected = m.total_collected ?? m.total_revenue;
                   return (
                     <tr key={i} className={`transition-colors ${hasData ? 'hover:bg-gray-50/50' : 'opacity-40'}`}>
                       <td className="px-6 py-3.5 text-sm font-bold text-gray-900">{m.month}</td>
-                      <td className="px-4 py-3.5 text-sm font-semibold text-gray-900 text-right">{m.total_revenue > 0 ? fmtFull(m.total_revenue) : '—'}</td>
+                      <td className="px-4 py-3.5 text-sm font-semibold text-blue-700 text-right">{m.total_revenue > 0 ? fmtFull(m.total_revenue) : '—'}</td>
+                      <td className="px-4 py-3.5 text-sm font-semibold text-emerald-700 text-right">{collected > 0 ? fmtFull(collected) : '—'}</td>
                       {isPlatformOwner && <td className="px-4 py-3.5 text-sm font-semibold text-purple-700 text-right">{m.client_revenue > 0 ? fmtFull(m.client_revenue) : '—'}</td>}
                       <td className="px-4 py-3.5 text-sm font-semibold text-red-600 text-right">{m.expenses > 0 ? fmtFull(m.expenses) : '—'}</td>
                       <td className="px-4 py-3.5 text-right">
@@ -282,28 +286,27 @@ export default function FinanceReportsPage({ role }: Props) {
                       <td className="px-4 py-3.5 text-right">
                         <span className="text-sm font-bold text-emerald-600">{m.paid_count || '—'}</span>
                       </td>
-                      {!isPlatformOwner && (
-                        <td className="px-4 py-3.5 text-right">
-                          <span className="text-sm font-bold text-amber-600">{m.pending_count || '—'}</span>
-                        </td>
-                      )}
+                      <td className="px-4 py-3.5 text-right">
+                        <span className="text-sm font-bold text-amber-600">{m.pending_count || '—'}</span>
+                      </td>
                     </tr>
                   );
                 })}
                 {/* Totals row */}
                 <tr className="bg-gray-900 text-white font-black">
                   <td className="px-6 py-4 text-sm">Total</td>
-                  <td className="px-4 py-4 text-sm text-right">{fmtFull(totals.total_revenue)}</td>
-                  {isPlatformOwner && <td className="px-4 py-4 text-sm text-right text-purple-300">{fmtFull(monthly.reduce((s: number, m: any) => s + m.client_revenue, 0))}</td>}
+                  <td className="px-4 py-4 text-sm text-right text-blue-300">{fmtFull(totals.total_revenue)}</td>
+                  <td className="px-4 py-4 text-sm text-right text-emerald-400">{fmtFull(totals.total_collected ?? totals.total_revenue)}</td>
+                  {isPlatformOwner && <td className="px-4 py-4 text-sm text-right text-purple-300">{fmtFull(monthly.reduce((s: number, m: any) => s + (m.client_revenue || 0), 0))}</td>}
                   <td className="px-4 py-4 text-sm text-right text-red-300">{fmtFull(totals.expenses)}</td>
                   <td className="px-4 py-4 text-sm text-right">
                     <span className={totals.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
                       {fmtFull(totals.net_profit)}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-sm text-right">{monthly.reduce((s: number, m: any) => s + m.invoice_count, 0)}</td>
-                  <td className="px-4 py-4 text-sm text-right text-emerald-400">{monthly.reduce((s: number, m: any) => s + m.paid_count, 0)}</td>
-                  {!isPlatformOwner && <td className="px-4 py-4 text-sm text-right text-amber-300">{monthly.reduce((s: number, m: any) => s + (m.pending_count || 0), 0)}</td>}
+                  <td className="px-4 py-4 text-sm text-right">{monthly.reduce((s: number, m: any) => s + (m.invoice_count || 0), 0)}</td>
+                  <td className="px-4 py-4 text-sm text-right text-emerald-400">{monthly.reduce((s: number, m: any) => s + (m.paid_count || 0), 0)}</td>
+                  <td className="px-4 py-4 text-sm text-right text-amber-300">{monthly.reduce((s: number, m: any) => s + (m.pending_count || 0), 0)}</td>
                 </tr>
               </tbody>
             </table>
