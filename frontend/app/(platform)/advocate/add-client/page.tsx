@@ -5,6 +5,7 @@ import { Link2, Copy, UserPlus, Loader2, AlertCircle, User } from 'lucide-react'
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 
 type AddMethod = 'manual' | 'link';
 
@@ -94,7 +95,7 @@ export default function AdvocateAddClientPage() {
     if (!clientLink) return;
     const fullUrl = `${window.location.origin}/join/${clientLink.id}`;
     navigator.clipboard.writeText(fullUrl);
-    alert('Link copied to clipboard!');
+    toast.success('Link copied to clipboard!');
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {

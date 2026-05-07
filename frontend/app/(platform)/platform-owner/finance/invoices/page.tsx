@@ -7,6 +7,7 @@ import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import InvoiceDefaultTemplate from '@/components/InvoiceDefaultTemplate';
+import { toast } from 'react-hot-toast';
 import {
   FileText, Plus, Search, Filter,
   Eye, X, Trash2, FileDown, Edit,
@@ -133,15 +134,15 @@ export default function PlatformOwnerInvoicesPage() {
     try {
       const res = await customFetch(API.BILLING.ADVOCATE_INVOICES.SEND_TO_ADVOCATE(inv.id), { method: 'POST' });
       if (res.ok) {
-        alert('Invoice sent to advocate successfully!');
+        toast.success('Invoice sent to advocate successfully!');
         fetchAdvocateInvoices();
         if (selectedInvoice?.id === inv.id) fetchInvoiceDetail(inv.id);
       } else {
         const err = await res.json();
-        alert(`Failed: ${err.error || 'Unknown error'}`);
+        toast.error(`Failed: ${err.error || 'Unknown error'}`);
       }
     } catch {
-      alert('Error sending invoice');
+      toast.error('Error sending invoice');
     }
   };
 
@@ -162,15 +163,15 @@ export default function PlatformOwnerInvoicesPage() {
         })
       });
       if (res.ok) {
-        alert('Invoice marked as paid!');
+        toast.success('Invoice marked as paid!');
         fetchInvoiceDetail(selectedInvoice.id);
         fetchInvoices(currentPage, activeFilter);
       } else {
         const err = await res.json();
-        alert(`Failed: ${err.error || 'Unknown error'}`);
+        toast.error(`Failed: ${err.error || 'Unknown error'}`);
       }
     } catch {
-      alert('Error marking invoice as paid');
+      toast.error('Error marking invoice as paid');
     }
   };
 
@@ -339,8 +340,8 @@ export default function PlatformOwnerInvoicesPage() {
                             <button onClick={async () => {
                               if (confirm('Delete this invoice?')) {
                                 const res = await customFetch(API.BILLING.INVOICES.DETAIL(inv.id), { method: 'DELETE' });
-                                if (res.ok || res.status === 204) { alert('Deleted'); fetchInvoices(currentPage, activeFilter); }
-                                else alert('Failed to delete');
+                                if (res.ok || res.status === 204) { toast.success('Deleted'); fetchInvoices(currentPage, activeFilter); }
+                                else toast.error('Failed to delete');
                               }
                             }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
                               <Trash2 className="w-4 h-4" />

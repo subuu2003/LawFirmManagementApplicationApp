@@ -4,6 +4,7 @@ import { use, useEffect, useState } from 'react';
 import { UserPlus, Shield, MapPin, Phone, Mail, Hash, Loader2, X, Search, Check, Building2 } from 'lucide-react';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 export default function BranchOverviewPage({ params }: { params: Promise<{ branchId: string }> }) {
   const { branchId } = use(params);
@@ -91,7 +92,7 @@ export default function BranchOverviewPage({ params }: { params: Promise<{ branc
         // Refresh branch to show new admin
         const branchRes = await customFetch(API.FIRMS.BRANCHES.DETAIL(branchId));
         if (branchRes.ok) setBranch(await branchRes.json());
-        alert(`${selectedAdmin.first_name} has been assigned as branch admin.`);
+        toast.success(`${selectedAdmin.first_name} has been assigned as branch admin.`);
       } else {
         const data = await response.json();
         setAssignError(data.detail || data.error || 'Failed to assign admin');

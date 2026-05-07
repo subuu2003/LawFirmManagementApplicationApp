@@ -65,6 +65,7 @@ import { API, API_BASE_URL } from '@/lib/api';
 import { useRouter, useParams } from 'next/navigation';
 import { Country, State, City } from 'country-state-city';
 import { useTopbarTitle } from '@/components/platform/TopbarContext';
+import { toast } from 'react-hot-toast';
 
 export const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
@@ -790,11 +791,11 @@ export function TeamPage({ accent, viewBase, role }: AccentProps & { viewBase?: 
         setShowJoinLinkModal(true);
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'Failed to create link');
+        toast.error(errorData.error || 'Failed to create link');
       }
     } catch (err: any) {
       console.error('Error creating link:', err);
-      alert('Failed to create join link');
+      toast.error('Failed to create join link');
     } finally {
       setCreatingLink(false);
     }
@@ -804,7 +805,7 @@ export function TeamPage({ accent, viewBase, role }: AccentProps & { viewBase?: 
     if (!joinLink) return;
     const fullUrl = `${window.location.origin}/join/${joinLink.id}`;
     navigator.clipboard.writeText(fullUrl);
-    alert('Link copied to clipboard!');
+    toast.success('Link copied to clipboard!');
   };
 
   const rows = users.map((u, i) => {
@@ -1997,11 +1998,11 @@ export function ClientsPage({ accent, viewBase, role }: AccentProps & { viewBase
         setShowJoinLinkModal(true);
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'Failed to create link');
+        toast.error(errorData.error || 'Failed to create link');
       }
     } catch (err: any) {
       console.error('Error creating link:', err);
-      alert('Failed to create join link');
+      toast.error('Failed to create join link');
     } finally {
       setCreatingLink(false);
     }
@@ -2011,7 +2012,7 @@ export function ClientsPage({ accent, viewBase, role }: AccentProps & { viewBase
     if (!joinLink) return;
     const fullUrl = `${window.location.origin}/join/${joinLink.id}`;
     navigator.clipboard.writeText(fullUrl);
-    alert('Link copied to clipboard!');
+    toast.success('Link copied to clipboard!');
   };
 
   const rows = clients.map((u, i) => {

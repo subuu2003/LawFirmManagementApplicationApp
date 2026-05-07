@@ -25,14 +25,24 @@ interface FinanceData {
   };
   charts: {
     revenue_expenses: {
-      revenue: { month: string; amount: number }[];
-      expenses: { month: string; amount: number }[];
+      revenue: { month: string; amount?: number; revenue?: number }[];
+      expenses: { month: string; amount?: number; expense?: number }[];
     };
   };
-  top_clients: { id: number; name: string; revenue: number; percentage: number }[];
-  outstanding_invoices: { id: string; client: string; amount: string; status: string; days: number }[];
-  recent_invoices: { id: string; client: string; amount: string; status: string; date: string }[];
-  recent_payouts: { id: string; name: string; role: string; amount: string; status: string }[];
+  top_clients: { id?: number; client_id?: string; name?: string; client_name?: string; revenue: number; percentage: number }[];
+  outstanding_invoices: any[];
+  recent_invoices: any[];
+  recent_payouts: any[];
+  user_type?: string;
+  subscription?: {
+    plan_name: string;
+    plan_type: string;
+    price: number;
+    billing_cycle: string;
+    status: string;
+    end_date: string;
+    is_valid: boolean;
+  };
 }
 
 export default function FinanceDashboard() {
@@ -87,12 +97,21 @@ export default function FinanceDashboard() {
     );
   }
 
-  // Map chart data safely
-  const chartData = (data.charts.revenue_expenses.revenue || []).map((item, index) => ({
-    name: item.month,
-    revenue: item.amount,
-    expenses: data.charts.revenue_expenses.expenses[index]?.amount || 0
-  }));
+  // Map chart data safely combining all unique months
+  const allMonths = Array.from(new Set([
+    ...(data.charts?.revenue_expenses?.revenue || []).map((r: any) => r.month),
+    ...(data.charts?.revenue_expenses?.expenses || []).map((e: any) => e.month)
+  ]));
+
+  const chartData = allMonths.map(month => {
+    const revItem = (data.charts?.revenue_expenses?.revenue || []).find((r: any) => r.month === month);
+    const expItem = (data.charts?.revenue_expenses?.expenses || []).find((e: any) => e.month === month);
+    return {
+      name: month,
+      revenue: revItem?.amount || revItem?.revenue || 0,
+      expenses: expItem?.amount || expItem?.expense || 0
+    };
+  });
 
   const { summary } = data;
 
@@ -258,7 +277,7 @@ export default function FinanceDashboard() {
                       <div className="flex items-center gap-3">
                         <span className="text-xs font-black text-gray-400 w-4">#{index + 1}</span>
                         <span className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors truncate max-w-[150px]">
-                          {client.name}
+                          {client.name || client.client_name || 'Unknown Client'}
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
@@ -290,25 +309,31 @@ export default function FinanceDashboard() {
                 <h3 className="text-lg font-bold text-gray-900">Outstanding</h3>
               </div>
               <div className="space-y-4">
-                {data.outstanding_invoices.length > 0 ? data.outstanding_invoices.map((inv, idx) => (
-                  <div key={idx} className="flex items-start justify-between p-4 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors bg-gray-50/50">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-gray-500 mb-0.5">{inv.id}</p>
-                      <p className="text-sm font-semibold text-gray-900 truncate">{inv.client}</p>
-                      <p className="text-xs font-medium text-gray-500 mt-1.5 flex items-center gap-1">
-                        <Calendar className="w-3 h-3" /> {inv.days > 0 ? `Due in ${inv.days} days` : 'Overdue'}
-                      </p>
+                {data.outstanding_invoices.length > 0 ? data.outstanding_invoices.map((inv, idx) => {
+                  const id = inv.invoice_number || inv.invoice_id || inv.id;
+                  const client = inv.client_name || inv.client;
+                  const days = inv.days_overdue || inv.days || 0;
+                  const amountStr = typeof inv.amount === 'number' ? `₹${inv.amount.toLocaleString('en-IN')}` : inv.amount;
+                  return (
+                    <div key={idx} className="flex items-start justify-between p-4 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors bg-gray-50/50">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-gray-500 mb-0.5">{id}</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">{client}</p>
+                        <p className="text-xs font-medium text-gray-500 mt-1.5 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" /> {days > 0 ? `Due in ${days} days` : 'Overdue'}
+                        </p>
+                      </div>
+                      <div className="text-right flex flex-col items-end gap-2 ml-4">
+                        <p className="text-sm font-bold text-gray-900">{amountStr}</p>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${
+                          (inv.status || '').toLowerCase() === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {inv.status || 'Pending'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right flex flex-col items-end gap-2 ml-4">
-                      <p className="text-sm font-bold text-gray-900">{inv.amount}</p>
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${
-                        inv.status.toLowerCase() === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {inv.status}
-                      </span>
-                    </div>
-                  </div>
-                )) : <p className="text-center py-10 text-gray-300 text-sm italic">Clear portfolio</p>}
+                  );
+                }) : <p className="text-center py-10 text-gray-300 text-sm italic">Clear portfolio</p>}
               </div>
             </div>
 
@@ -327,24 +352,30 @@ export default function FinanceDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {data.recent_invoices.length > 0 ? data.recent_invoices.map((inv, idx) => (
-                      <tr key={idx} className="group hover:bg-gray-50/50 transition-colors">
-                        <td className="py-3.5 text-sm font-bold text-gray-700">
-                          <span className="truncate block max-w-[100px]">{inv.client}</span>
-                          <span className="block text-xs font-medium text-gray-400 mt-0.5">{inv.date}</span>
-                        </td>
-                        <td className="py-3.5 text-sm font-bold text-gray-900 text-right">{inv.amount}</td>
-                        <td className="py-3.5 text-right flex justify-end">
-                          <span className={`text-[11px] font-bold px-2 py-1 rounded-lg flex items-center justify-center min-w-[60px] ${
-                            inv.status.toLowerCase() === 'paid' ? 'bg-emerald-100 text-emerald-700' :
-                            inv.status.toLowerCase() === 'partial' ? 'bg-indigo-100 text-indigo-700' :
-                            'bg-gray-100 text-gray-600'
-                          }`}>
-                            {inv.status}
-                          </span>
-                        </td>
-                      </tr>
-                    )) : <tr><td colSpan={3} className="text-center py-10 text-gray-300 text-xs italic">No recent activity</td></tr>}
+                    {data.recent_invoices.length > 0 ? data.recent_invoices.map((inv, idx) => {
+                      const client = inv.client_name || inv.client;
+                      const date = inv.invoice_date || inv.date;
+                      const amountStr = typeof inv.amount === 'number' ? `₹${inv.amount.toLocaleString('en-IN')}` : inv.amount;
+                      const status = inv.status || 'draft';
+                      return (
+                        <tr key={idx} className="group hover:bg-gray-50/50 transition-colors">
+                          <td className="py-3.5 text-sm font-bold text-gray-700">
+                            <span className="truncate block max-w-[100px]">{client}</span>
+                            <span className="block text-xs font-medium text-gray-400 mt-0.5">{date}</span>
+                          </td>
+                          <td className="py-3.5 text-sm font-bold text-gray-900 text-right">{amountStr}</td>
+                          <td className="py-3.5 text-right flex justify-end">
+                            <span className={`text-[11px] font-bold px-2 py-1 rounded-lg flex items-center justify-center min-w-[60px] ${
+                              status.toLowerCase() === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                              status.toLowerCase() === 'partial' ? 'bg-indigo-100 text-indigo-700' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    }) : <tr><td colSpan={3} className="text-center py-10 text-gray-300 text-xs italic">No recent activity</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -387,33 +418,52 @@ export default function FinanceDashboard() {
             </div>
           </div>
 
+          {data.subscription ? (
           <div className="bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-8 rounded-3xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 md:gap-4 relative overflow-hidden text-white">
             <div className="absolute top-0 right-0 p-10 opacity-5">
               <Crown className="w-64 h-64 rotate-12 text-white" />
             </div>
             <div className="relative z-10 space-y-2 text-center md:text-left flex-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/20 border border-blue-400/30 text-blue-300 rounded-full text-xs font-bold tracking-wide uppercase mb-2">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Active Plan
+                <CheckCircle2 className="w-3.5 h-3.5" /> {data.subscription.status === 'active' ? 'Active Plan' : 'Subscription'}
               </div>
-              <h3 className="text-2xl font-extrabold text-white">Business Enterprise Plan</h3>
+              <h3 className="text-2xl font-extrabold text-white">{data.subscription.plan_name}</h3>
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm font-medium text-slate-300 pt-2">
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Unlimited Clients</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Unlimited Matters</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> API Access</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Priority Support</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Professional Plan</span>
               </div>
             </div>
             <div className="relative z-10 bg-white/10 backdrop-blur-md border border-white/10 p-6 rounded-2xl flex flex-col items-center min-w-[240px]">
               <p className="text-slate-300 text-sm font-bold uppercase tracking-wider mb-1">Current Billing</p>
               <div className="flex items-end gap-1 mb-5">
-                <span className="text-4xl font-black text-white">₹2,499</span>
-                <span className="text-slate-400 font-bold mb-1">/ month</span>
+                <span className="text-4xl font-black text-white">₹{data.subscription.price.toLocaleString('en-IN')}</span>
+                <span className="text-slate-400 font-bold mb-1">/ {data.subscription.billing_cycle || 'month'}</span>
               </div>
-              <button className="w-full py-3 px-4 bg-white text-slate-900 rounded-xl font-bold shadow-md hover:scale-[1.02] transition-transform flex items-center justify-center gap-2">
+              <Link href="/super-admin/finance/subscriptions" className="w-full py-3 px-4 bg-white text-slate-900 rounded-xl font-bold shadow-md hover:scale-[1.02] transition-transform flex items-center justify-center gap-2">
                 <Settings className="w-4 h-4" /> Manage Subscription
-              </button>
+              </Link>
             </div>
           </div>
+          ) : (
+          <div className="bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-8 rounded-3xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 md:gap-4 relative overflow-hidden text-white">
+            <div className="absolute top-0 right-0 p-10 opacity-5">
+              <Crown className="w-64 h-64 rotate-12 text-white" />
+            </div>
+            <div className="relative z-10 space-y-2 text-center md:text-left flex-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/20 border border-blue-400/30 text-blue-300 rounded-full text-xs font-bold tracking-wide uppercase mb-2">
+                <CheckCircle2 className="w-3.5 h-3.5" /> No Active Plan
+              </div>
+              <h3 className="text-2xl font-extrabold text-white">Get a Subscription</h3>
+              <p className="text-sm font-medium text-slate-300 pt-2">
+                Please subscribe to a plan to unlock all features.
+              </p>
+            </div>
+            <div className="relative z-10 bg-white/10 backdrop-blur-md border border-white/10 p-6 rounded-2xl flex flex-col items-center min-w-[240px]">
+              <Link href="/super-admin/finance/subscriptions" className="w-full py-3 px-4 bg-white text-slate-900 rounded-xl font-bold shadow-md hover:scale-[1.02] transition-transform flex items-center justify-center gap-2">
+                <Settings className="w-4 h-4" /> View Plans
+              </Link>
+            </div>
+          </div>
+          )}
         </div>
       </div>
     </div>

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 interface EventDetailsModalProps {
   eventId: string | null;
@@ -113,10 +114,10 @@ export default function EventDetailsModal({ eventId, isOpen, onClose, onRefresh 
         fetchEventDetails();
         onRefresh();
       } else {
-        alert("Failed to update event.");
+        toast.error("Failed to update event.");
       }
     } catch (err) {
-      alert("Network error.");
+      toast.error("Network error.");
     } finally {
       setActionLoading(false);
     }
@@ -143,10 +144,10 @@ export default function EventDetailsModal({ eventId, isOpen, onClose, onRefresh 
         onClose();
       } else {
         const data = await response.json();
-        alert(data.message || "Action failed.");
+        toast.error(data.message || "Action failed.");
       }
     } catch (err) {
-      alert("Network error.");
+      toast.error("Network error.");
     } finally {
       setActionLoading(false);
     }

@@ -5,6 +5,7 @@ import { Users, Phone, Mail, FileText, Download, Eye, Search, Loader2, AlertCirc
 import Link from 'next/link';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 interface Client {
   id: string;
@@ -81,7 +82,7 @@ export default function AdvocateClientsPage() {
       setClientDocuments(data);
     } catch (err: any) {
       console.error('Error fetching documents:', err);
-      alert('Failed to load client documents');
+      toast.error('Failed to load client documents');
     } finally {
       setDocumentsLoading(false);
     }

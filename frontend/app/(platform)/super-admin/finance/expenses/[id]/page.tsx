@@ -12,6 +12,7 @@ import {
   Briefcase, User, Tags, Receipt, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 
 interface Case {
   id: string;
@@ -137,7 +138,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
         setIsEditing(false);
       }
     } catch (err) {
-      alert("Failed to update");
+      toast.error("Failed to update");
     } finally {
       setIsSubmitting(false);
     }
@@ -149,7 +150,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
       const res = await customFetch(API.BILLING.EXPENSES.DETAIL(id), { method: 'DELETE' });
       if (res.ok) router.push('/super-admin/finance/expenses');
     } catch (err) {
-      alert("Failed to delete");
+      toast.error("Failed to delete");
     }
   };
 

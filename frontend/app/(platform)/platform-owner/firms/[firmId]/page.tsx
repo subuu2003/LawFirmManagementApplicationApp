@@ -15,6 +15,7 @@ import {
 import { customFetch } from '@/lib/fetch';
 import { API, API_BASE_URL, SUBSCRIPTION_PLANS } from '@/lib/api';
 import { useTopbarTitle } from '@/components/platform/TopbarContext';
+import { toast } from 'react-hot-toast';
 
 const BRAND = '#0e2340';
 
@@ -202,7 +203,7 @@ export default function PlatformOwnerFirmOverviewPage({
       setLogoFile(null);
       setLogoPreview(data.logo ? (data.logo.startsWith('http') ? data.logo : `${API_BASE_URL}${data.logo}`) : null);
 
-      alert('Firm details updated successfully');
+      toast.success('Firm details updated successfully');
     } catch (err: any) {
       setError(err.message || 'Failed to update firm details');
       console.error(err);
