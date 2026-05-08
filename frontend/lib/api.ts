@@ -84,7 +84,7 @@ export const API = {
     DETAIL: (id: string) => `/api/join-links/${id}/`,
     DELETE: (id: string) => `/api/join-links/${id}/`,
     GET_DETAILS: (id: string) => `/api/join-links/${id}/details/`,
-    JOIN: (id: string) => `/api/join-links/${id}/join//`
+    JOIN: (id: string) => `/api/join-links/${id}/join/`
   },
   CALENDAR: {
     EVENTS: "/api/calendar/events/",
