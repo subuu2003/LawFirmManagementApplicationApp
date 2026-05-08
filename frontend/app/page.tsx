@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
+import Lenis from 'lenis';
+import 'lenis/dist/lenis.css';
 
 /* ─────────────────────────────────────────
    DESIGN SYSTEM
@@ -224,10 +226,10 @@ function Visual3() {
             <div
               key={`d${day}`}
               className={`relative py-1 rounded-lg text-[11px] font-medium transition-all ${day === today
-                  ? "bg-[#0e2340] text-white"
-                  : evt
-                    ? "bg-[#0e2340]/6 text-[#0e2340]"
-                    : "text-gray-400 hover:bg-gray-50"
+                ? "bg-[#0e2340] text-white"
+                : evt
+                  ? "bg-[#0e2340]/6 text-[#0e2340]"
+                  : "text-gray-400 hover:bg-gray-50"
                 }`}
             >
               {day}
@@ -296,9 +298,30 @@ export default function LandingPage() {
     fetchConfig();
   }, []);
 
+  // ── Smooth Scroll (Lenis) ────────────────────────────────────────────────
+  useEffect(() => {
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // https://www.desmos.com/calculator/brs54l4xou
+      smoothWheel: true,
+      wheelMultiplier: 1,
+    });
+
+    function raf(time: number) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+
+    requestAnimationFrame(raf);
+
+    return () => {
+      lenis.destroy();
+    };
+  }, []);
+
   // ── Scroll & Mouse Motion Values ──────────────────────────────────────────
   const featureSectionRef = useRef<HTMLElement>(null);
-  
+
   const { scrollYProgress: featureScrollY } = useScroll({
     target: featureSectionRef,
     offset: ["start start", "end end"]
@@ -322,7 +345,7 @@ export default function LandingPage() {
 
   const { scrollY } = useScroll();
   const activeVisualRef = useRef(0);
-  
+
   useMotionValueEvent(scrollY, "change", () => {
     let closestIndex = 0;
     let minDistance = Infinity;
@@ -379,6 +402,10 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white overflow-x-clip">
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+        html {
+          scroll-behavior: smooth;
+        }
 
         :root {
           --navy: #0e2340;
@@ -443,8 +470,8 @@ export default function LandingPage() {
 
       {/* ── NAV ───────────────────────────────── */}
       <nav className={`fixed top-0 w-full z-50 transition-all duration-400 ${scrolled
-          ? "bg-white/96 backdrop-blur-2xl shadow-[0_1px_0_0_rgba(14,35,64,0.08)]"
-          : "bg-transparent"
+        ? "bg-white/96 backdrop-blur-2xl shadow-[0_1px_0_0_rgba(14,35,64,0.08)]"
+        : "bg-transparent"
         }`}>
         <div className="max-w-7xl mx-auto px-6 h-[72px] flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 group">
@@ -576,7 +603,7 @@ export default function LandingPage() {
                     href="/register"
                     className="group bg-[var(--navy)] text-white px-8 py-4 rounded-full font-semibold text-base hover:bg-[var(--navy-mid)] hover:shadow-xl hover:shadow-[var(--navy)]/20 transition-all flex items-center justify-center gap-2.5"
                   >
-                    Contact Us
+                    Join today
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 ) : (
@@ -1173,7 +1200,7 @@ export default function LandingPage() {
                     href="/register"
                     className="group bg-white text-[var(--navy)] px-9 py-4 rounded-full font-bold text-base hover:shadow-2xl transition-all flex items-center justify-center gap-2"
                   >
-                    Contact Us
+                    Get Started
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 ) : (

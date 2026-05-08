@@ -1,5 +1,7 @@
-import { CaseDetailPage } from '@/components/platform/page-templates';
+import { CaseWorkspace } from '@/components/platform/CaseWorkspace';
 
 export default function AdvocateCaseDetailPage() {
-  return <CaseDetailPage accent="#4a1c40" roleTitle="Advocate" allowChat />;
+  return (
+    <CaseWorkspace />
+  );
 }
