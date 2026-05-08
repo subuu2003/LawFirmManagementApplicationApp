@@ -1883,10 +1883,11 @@ class FirmJoinLinkViewSet(viewsets.ModelViewSet):
             # 6. Generate Auth Token
             token, _ = Token.objects.get_or_create(user=user)
             
-            log_audit(user, 'join_via_link', f"Joined {link.firm.firm_name} via generic link as {link.get_user_type_display()}")
+            firm_name = link.firm.firm_name if link.firm else "Solo Practice"
+            log_audit(user, 'join_via_link', f"Joined {firm_name} via generic link as {link.get_user_type_display()}")
             
             return Response({
-                'message': f"Welcome! You have successfully joined {link.firm.firm_name}",
+                'message': f"Welcome! You have successfully joined {firm_name}",
                 'token': token.key,
                 'user': CustomUserSerializer(user).data
             }, status=status.HTTP_201_CREATED)

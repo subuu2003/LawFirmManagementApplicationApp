@@ -1,4 +1,4 @@
-name: Deploy Frontend
+name: Build Frontend
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     
     steps:
@@ -40,18 +40,9 @@ jobs:
             frontend/package-lock.json \
             frontend/next.config.ts
       
-      - name: Deploy to server
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y sshpass
-          sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no frontend-build.tar.gz sammy@157.245.101.58:/home/sammy/LawFirmManagementApplicationApp/
-      
-      - name: Extract and restart
-        run: |
-          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no sammy@157.245.101.58 << 'EOF'
-            cd /home/sammy/LawFirmManagementApplicationApp
-            tar -xzf frontend-build.tar.gz
-            rm frontend-build.tar.gz
-            cd frontend
-            pm2 restart lawfirm-frontend
-          EOF
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: frontend-build.tar.gz
+          retention-days: 7
