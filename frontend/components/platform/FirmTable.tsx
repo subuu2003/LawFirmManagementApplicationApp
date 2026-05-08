@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Search, MoreVertical, PauseCircle, Trash2, Eye, CheckCircle2, XCircle, ArrowRight, Loader2, Building2 } from 'lucide-react';
 import { customFetch } from '@/lib/fetch';
 import { API, API_BASE_URL } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 interface SuperAdminDetails {
   id: string;
@@ -96,7 +97,7 @@ export default function FirmTable() {
       
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'An error occurred while updating firm status');
+      toast.error(err.message || 'An error occurred while updating firm status');
     }
   };
 

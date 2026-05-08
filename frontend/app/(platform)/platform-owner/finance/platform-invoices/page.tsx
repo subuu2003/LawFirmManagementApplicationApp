@@ -7,6 +7,7 @@ import { customFetch } from '@/lib/fetch';
 import { API, API_BASE_URL } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import InvoiceDefaultTemplate from '@/components/InvoiceDefaultTemplate';
+import { toast } from 'react-hot-toast';
 import {
   FileText, Plus, Search, Filter,
   Eye, Send, X, Trash2, FileDown, Edit,
@@ -135,14 +136,14 @@ export default function PlatformOwnerBillingPage() {
     try {
       const res = await customFetch(API.SUBSCRIPTIONS.PLATFORM_INVOICES.SEND(selectedInvoice.id), { method: 'POST' });
       if (res.ok) {
-        alert("Invoice sent successfully!");
+        toast.success("Invoice sent successfully!");
         fetchInvoiceDetail(selectedInvoice.id);
         fetchInvoices(currentPage, activeFilter);
       } else {
-        alert("Failed to send invoice.");
+        toast.error("Failed to send invoice.");
       }
     } catch (err) {
-      alert("Error sending invoice");
+      toast.error("Error sending invoice");
     }
   };
 
@@ -165,15 +166,15 @@ export default function PlatformOwnerBillingPage() {
         })
       });
       if (res.ok) {
-        alert("Invoice marked as paid!");
+        toast.success("Invoice marked as paid!");
         fetchInvoiceDetail(selectedInvoice.id);
         fetchInvoices(currentPage, activeFilter);
       } else {
         const errorData = await res.json();
-        alert(`Failed to mark paid: ${errorData.error || 'Unknown error'}`);
+        toast.error(`Failed to mark paid: ${errorData.error || 'Unknown error'}`);
       }
     } catch (err) {
-      alert("Error marking invoice as paid");
+      toast.error("Error marking invoice as paid");
     }
   };
 
@@ -187,14 +188,14 @@ export default function PlatformOwnerBillingPage() {
         body: JSON.stringify({ reason: "Manually cancelled by platform owner" })
       });
       if (res.ok) {
-        alert("Invoice cancelled!");
+        toast.success("Invoice cancelled!");
         fetchInvoiceDetail(selectedInvoice.id);
         fetchInvoices(currentPage, activeFilter);
       } else {
-        alert("Failed to cancel invoice");
+        toast.error("Failed to cancel invoice");
       }
     } catch (err) {
-      alert("Error cancelling invoice");
+      toast.error("Error cancelling invoice");
     }
   };
 
@@ -371,13 +372,13 @@ export default function PlatformOwnerBillingPage() {
                                   try {
                                     const res = await customFetch(API.SUBSCRIPTIONS.PLATFORM_INVOICES.DETAIL(inv.id), { method: 'DELETE' });
                                     if (res.ok || res.status === 204) {
-                                      alert("Invoice deleted");
+                                      toast.success("Invoice deleted");
                                       fetchInvoices(currentPage, activeFilter);
                                     } else {
-                                      alert("Failed to delete");
+                                      toast.error("Failed to delete");
                                     }
                                   } catch (err) {
-                                    alert("Error deleting invoice");
+                                    toast.error("Error deleting invoice");
                                   }
                                 }
                               }}

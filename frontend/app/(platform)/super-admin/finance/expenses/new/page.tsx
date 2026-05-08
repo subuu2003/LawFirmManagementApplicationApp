@@ -10,6 +10,7 @@ import {
   ChevronDown, Search, CloudUpload, AlertCircle, User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 
 interface Case {
   id: string;
@@ -124,7 +125,7 @@ export default function CreateExpensePage() {
 
   const handleSubmit = async () => {
     if (!date || !expenseType || amount <= 0 || !description || !submittedBy) {
-      alert("Please fill all required fields (Date, Type, Amount, Description)");
+      toast.success("Please fill all required fields (Date, Type, Amount, Description)");
       return;
     }
 
@@ -153,10 +154,10 @@ export default function CreateExpensePage() {
         router.push('/super-admin/finance/expenses');
       } else {
         const err = await res.json();
-        alert("Error: " + JSON.stringify(err));
+        toast.error("Error: " + JSON.stringify(err));
       }
     } catch (err) {
-      alert("Network error");
+      toast.error("Network error");
     } finally {
       setIsSubmitting(false);
     }

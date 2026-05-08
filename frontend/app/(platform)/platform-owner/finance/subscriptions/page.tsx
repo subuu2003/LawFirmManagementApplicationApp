@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   CheckCircle2, X, Zap, Briefcase, Building2, Crown,
-  Users, HardDrive, Calendar, CreditCard, Activity, Clock, ShieldCheck, Loader2, AlertCircle, Search
+  Users, HardDrive, Calendar, CreditCard, Activity, Clock, ShieldCheck, Loader2, AlertCircle, Search, Plus, Save, Trash2, Power
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTopbarTitle } from '@/components/platform/TopbarContext';
 import { customFetch } from '@/lib/fetch';
 import { API, SUBSCRIPTION_PLANS } from '@/lib/api';
+import PlanModal from '@/components/platform-owner/PlanModal';
+import { toast } from 'react-hot-toast';
 
 const planMeta: Record<string, { icon: any; color: string; bg: string; features: string[] }> = {
   Trial: {
@@ -38,29 +40,33 @@ export default function PlatformOwnerSubscriptionsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'plans' | 'firms'>('firms');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [plansRes, firmSubsRes] = await Promise.all([
+        customFetch(API.SUBSCRIPTIONS.PLANS.LIST),
+        customFetch('/api/subscriptions/firm-subscriptions/'),
+      ]);
+      if (plansRes.ok) {
+        const d = await plansRes.json();
+        setPlans(Array.isArray(d) ? d : (d.results || []));
+      }
+      if (firmSubsRes.ok) {
+        const d = await firmSubsRes.json();
+        setFirmSubs(Array.isArray(d) ? d : (d.results || []));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [plansRes, firmSubsRes] = await Promise.all([
-          customFetch(API.SUBSCRIPTIONS.PLANS.LIST),
-          customFetch('/api/subscriptions/firm-subscriptions/'),
-        ]);
-        if (plansRes.ok) {
-          const d = await plansRes.json();
-          setPlans(Array.isArray(d) ? d : (d.results || []));
-        }
-        if (firmSubsRes.ok) {
-          const d = await firmSubsRes.json();
-          setFirmSubs(Array.isArray(d) ? d : (d.results || []));
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadData();
   }, []);
 
   const filteredFirms = firmSubs.filter(s => {
@@ -75,6 +81,62 @@ export default function PlatformOwnerSubscriptionsPage() {
     if (s === 'expired' || s === 'suspended') return 'bg-red-100 text-red-700';
     if (s === 'trial') return 'bg-amber-100 text-amber-700';
     return 'bg-slate-100 text-slate-600';
+  };
+
+  const handleEdit = (plan: any) => {
+    setSelectedPlan(plan);
+    setIsModalOpen(true);
+  };
+
+  const handleCreate = () => {
+    setSelectedPlan(null);
+    setIsModalOpen(true);
+  };
+
+  const handleDeactivate = async (plan: any) => {
+    if (!confirm(`Are you sure you want to deactivate the "${plan.name}" plan?`)) return;
+    try {
+      const res = await customFetch(`/api/subscriptions/plans/${plan.id}/`, { method: 'DELETE' });
+
+      if (res.status === 204) {
+        toast.success('Plan deactivated successfully');
+        loadData();
+        return;
+      }
+
+      if (res.status === 500) {
+        toast.error('Cannot delete this because active subscriptions are using this plan');
+        return;
+      }
+
+      let data: any = {};
+      try { data = await res.json(); } catch (e) { }
+
+      if (res.ok) {
+        toast.success(data.message || 'Plan deactivated successfully');
+        loadData();
+      } else {
+        toast.error(data.error || 'Failed to deactivate plan');
+      }
+    } catch (e) {
+      toast.error('A network error occurred');
+    }
+  };
+
+  const handleActivate = async (plan: any) => {
+    try {
+      const res = await customFetch(`/api/subscriptions/plans/${plan.id}/activate/`, { method: 'POST' });
+      if (res.ok) {
+        toast.success('Plan reactivated successfully');
+        loadData();
+      } else {
+        let data: any = {};
+        try { data = await res.json(); } catch (e) { }
+        toast.error(data.error || 'Failed to reactivate plan');
+      }
+    } catch (e) {
+      toast.error('A network error occurred');
+    }
   };
 
   if (loading) {
@@ -181,21 +243,35 @@ export default function PlatformOwnerSubscriptionsPage() {
         {/* ALL PLANS TAB */}
         {activeTab === 'plans' && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-            <div>
-              <h2 className="text-xl font-black text-slate-900">Subscription Plans</h2>
-              <p className="text-sm text-slate-400 font-medium">All available plans on the platform</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Subscription Plans</h2>
+                <p className="text-sm text-slate-400 font-medium">All available plans on the platform</p>
+              </div>
+              <button
+                onClick={handleCreate}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#071526] text-white rounded-xl text-sm font-black shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                Create New Plan
+              </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
               {(plans.length > 0 ? plans : SUBSCRIPTION_PLANS).map((plan: any, idx: number) => {
                 const meta = planMeta[plan.name] || planMeta['Basic'];
                 const Icon = meta.icon;
-                const isPremium = plan.name === 'Enterprise';
+                const isPremium = plan.name === 'Enterprise' || plan.plan_type === 'premium' || plan.plan_type === 'enterprise';
                 return (
                   <motion.div
                     key={plan.id || idx}
                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.08 }}
-                    className={`relative rounded-2xl p-7 flex flex-col ${isPremium ? 'bg-gradient-to-b from-[#0f172a] to-[#1e293b] text-white' : 'bg-white border border-slate-100 shadow-sm'}`}
+                    className={`relative rounded-2xl p-7 flex flex-col ${isPremium ? 'bg-gradient-to-b from-[#0f172a] to-[#1e293b] text-white' : 'bg-white border border-slate-100 shadow-sm'} ${!plan.is_active ? 'grayscale opacity-75' : ''}`}
                   >
+                    {!plan.is_active && (
+                      <div className="absolute top-4 right-4 z-10 px-2 py-1 bg-red-500 text-white text-[9px] font-black uppercase rounded shadow-sm">
+                        Deactivated
+                      </div>
+                    )}
                     <div className="flex items-start justify-between mb-5">
                       <div>
                         <h3 className={`text-lg font-black ${isPremium ? 'text-white' : 'text-slate-900'}`}>{plan.name}</h3>
@@ -223,13 +299,9 @@ export default function PlatformOwnerSubscriptionsPage() {
                           /{plan.billing_cycle || 'month'}
                         </span>
                       )}
-                      {isPremium && (
-                        <p className="text-xs text-slate-400 mt-1">Contact us for pricing</p>
-                      )}
                     </div>
 
                     <div className="space-y-2.5 flex-1">
-                      {/* Real limits from API */}
                       {[
                         { label: `Max Advocates`, value: plan.max_advocates != null ? (plan.max_advocates >= 999 ? 'Unlimited' : plan.max_advocates) : null },
                         { label: `Max Paralegals`, value: plan.max_paralegals != null ? (plan.max_paralegals >= 999 ? 'Unlimited' : plan.max_paralegals) : null },
@@ -249,7 +321,6 @@ export default function PlatformOwnerSubscriptionsPage() {
                         </div>
                       ))}
 
-                      {/* Feature toggles */}
                       <div className={`mt-3 pt-3 border-t ${isPremium ? 'border-white/10' : 'border-slate-100'} grid grid-cols-2 gap-1.5`}>
                         {[
                           { label: 'Billing', on: plan.enable_billing },
@@ -271,8 +342,24 @@ export default function PlatformOwnerSubscriptionsPage() {
                       </div>
                     </div>
 
-                    <div className={`mt-6 pt-5 border-t ${isPremium ? 'border-white/10' : 'border-slate-100'}`}>
-                      <div className="flex items-center justify-between text-xs font-bold">
+                    <div className={`mt-6 pt-5 border-t ${isPremium ? 'border-white/10' : 'border-slate-100'} flex items-center justify-between`}>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleEdit(plan)}
+                          title="Edit Plan"
+                          className={`p-2 rounded-lg transition-colors ${isPremium ? 'hover:bg-white/10 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-900'}`}
+                        >
+                          <Save className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => plan.is_active ? handleDeactivate(plan) : handleActivate(plan)}
+                          title={plan.is_active ? "Deactivate Plan" : "Activate Plan"}
+                          className={`p-2 rounded-lg transition-colors ${plan.is_active ? (isPremium ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-50 text-red-500') : (isPremium ? 'hover:bg-emerald-500/20 text-emerald-400' : 'hover:bg-emerald-50 text-emerald-500')}`}
+                        >
+                          {plan.is_active ? <Trash2 className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-bold">
                         <span className={isPremium ? 'text-slate-400' : 'text-slate-500'}>Active firms</span>
                         <span className={isPremium ? 'text-white' : 'text-slate-900'}>
                           {firmSubs.filter(s => (s.plan_name || s.plan) === plan.name && s.status === 'active').length}
@@ -287,6 +374,12 @@ export default function PlatformOwnerSubscriptionsPage() {
         )}
 
       </div>
+      <PlanModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={loadData}
+        editPlan={selectedPlan}
+      />
     </div>
   );
 }

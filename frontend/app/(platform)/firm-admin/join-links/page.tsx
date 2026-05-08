@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Link2, Plus, Copy, Trash2, Users, Calendar, CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import { customFetch } from '@/lib/fetch';
 import { API, API_BASE_URL } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 interface JoinLink {
   id: string;
@@ -75,11 +76,11 @@ export default function JoinLinksPage() {
         setExpiresAt('');
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'Failed to create link');
+        toast.error(errorData.error || 'Failed to create link');
       }
     } catch (err: any) {
       console.error('Error creating link:', err);
-      alert('Failed to create join link');
+      toast.error('Failed to create join link');
     } finally {
       setCreating(false);
     }
@@ -96,18 +97,18 @@ export default function JoinLinksPage() {
       if (response.ok) {
         await fetchLinks();
       } else {
-        alert('Failed to delete link');
+        toast.error('Failed to delete link');
       }
     } catch (err) {
       console.error('Error deleting link:', err);
-      alert('Failed to delete join link');
+      toast.error('Failed to delete join link');
     }
   };
 
   const copyLinkToClipboard = (linkId: string) => {
     const fullUrl = `${window.location.origin}/join/${linkId}`;
     navigator.clipboard.writeText(fullUrl);
-    alert('Link copied to clipboard!');
+    toast.success('Link copied to clipboard!');
   };
 
   const getUserTypeOptions = () => {

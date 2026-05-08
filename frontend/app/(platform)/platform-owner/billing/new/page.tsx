@@ -10,6 +10,7 @@ import {
   ChevronDown, Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 
 export default function CreatePlatformInvoicePage() {
   const router = useRouter();
@@ -129,9 +130,9 @@ export default function CreatePlatformInvoicePage() {
   const totalAmount = planAmount + taxAmount;
 
   const handleSubmit = async () => {
-    if (!selectedFirm) return alert("Please select a firm");
-    if (!selectedPlan) return alert("Please select a subscription plan");
-    if (planAmount <= 0) return alert("Plan amount must be greater than zero");
+    if (!selectedFirm) return toast.error("Please select a firm");
+    if (!selectedPlan) return toast.error("Please select a subscription plan");
+    if (planAmount <= 0) return toast.error("Plan amount must be greater than zero");
 
     setIsSubmitting(true);
     try {
@@ -166,11 +167,11 @@ export default function CreatePlatformInvoicePage() {
       } else {
         const error = await res.json();
         console.error(error);
-        alert(`Error saving invoice: ${JSON.stringify(error)}`);
+        toast.error(`Error saving invoice: ${JSON.stringify(error)}`);
       }
     } catch (err) {
       console.error(err);
-      alert('Submission failed');
+      toast.error('Submission failed');
     } finally {
       setIsSubmitting(false);
     }

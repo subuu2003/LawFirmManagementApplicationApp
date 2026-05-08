@@ -7,6 +7,7 @@ import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import InvoiceDefaultTemplate from '@/components/InvoiceDefaultTemplate';
+import { toast } from 'react-hot-toast';
 import {
   FileText, Plus, Search, Filter, Download,
   MoreHorizontal, Eye, Send, X, PlusCircle,
@@ -291,13 +292,13 @@ export default function ClientInvoicesPage() {
                                   try {
                                     const res = await customFetch(API.BILLING.INVOICES.DETAIL(inv.id), { method: 'DELETE' });
                                     if (res.ok) {
-                                      alert("Invoice deleted");
+                                      toast.success("Invoice deleted");
                                       fetchInvoices(currentPage);
                                     } else {
-                                      alert("Failed to delete");
+                                      toast.error("Failed to delete");
                                     }
                                   } catch (err) {
-                                    alert("Error deleting invoice");
+                                    toast.error("Error deleting invoice");
                                   }
                                 }
                               }}
@@ -424,15 +425,15 @@ export default function ClientInvoicesPage() {
                             try {
                               const res = await customFetch(API.BILLING.INVOICES.DETAIL(selectedInvoice.id), { method: 'DELETE' });
                               if (res.ok) {
-                                alert("Invoice deleted");
+                                toast.success("Invoice deleted");
                                 setSelectedInvoice(null);
                                 setViewMode('full');
                                 fetchInvoices(currentPage);
                               } else {
-                                alert("Failed to delete");
+                                toast.error("Failed to delete");
                               }
                             } catch (err) {
-                              alert("Error deleting invoice");
+                              toast.error("Error deleting invoice");
                             }
                           }
                         }}

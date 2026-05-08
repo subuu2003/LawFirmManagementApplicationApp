@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTopbar } from '@/components/platform/TopbarContext';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 const navItems = [
   { label: 'Overview', path: '/client/dashboard', icon: LayoutDashboard },
@@ -62,11 +63,11 @@ export default function ClientSidebar() {
         setShowJoinLinkModal(true);
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'Failed to create link');
+        toast.error(errorData.error || 'Failed to create link');
       }
     } catch (err: any) {
       console.error('Error creating link:', err);
-      alert('Failed to create join link');
+      toast.error('Failed to create join link');
     } finally {
       setCreatingLink(false);
     }
@@ -76,7 +77,7 @@ export default function ClientSidebar() {
     if (!joinLink) return;
     const fullUrl = `${window.location.origin}/join/${joinLink.id}`;
     navigator.clipboard.writeText(fullUrl);
-    alert('Link copied to clipboard!');
+    toast.success('Link copied to clipboard!');
   };
 
   const sidebarContent = (

@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 export default function TimeEntryDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -117,10 +118,10 @@ export default function TimeEntryDetailsPage({ params }: { params: Promise<{ id:
         setIsEditing(false);
         fetchEntryDetails();
       } else {
-        alert("Failed to update time entry.");
+        toast.error("Failed to update time entry.");
       }
     } catch (err) {
-      alert("Network error.");
+      toast.error("Network error.");
     } finally {
       setActionLoading(false);
     }
@@ -137,11 +138,11 @@ export default function TimeEntryDetailsPage({ params }: { params: Promise<{ id:
           router.push('/advocate/billing');
         } else {
           const data = await response.json();
-          alert(data.message || "Action failed.");
+          toast.error(data.message || "Action failed.");
         }
       }
     } catch (err) {
-      alert("Network error.");
+      toast.error("Network error.");
     } finally {
       setActionLoading(false);
     }

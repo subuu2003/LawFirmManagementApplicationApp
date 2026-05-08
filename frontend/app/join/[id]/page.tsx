@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Building2, Users, Loader2, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 interface LinkDetails {
   firm_name: string;
@@ -74,12 +75,12 @@ export default function JoinPage() {
 
     // Validation
     if (formData.password !== formData.confirm_password) {
-      alert('Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
 
     if (formData.password.length < 8) {
-      alert('Password must be at least 8 characters long');
+      toast.error('Password must be at least 8 characters long');
       return;
     }
 
@@ -106,7 +107,7 @@ export default function JoinPage() {
         localStorage.setItem('user_details', JSON.stringify(data.user));
 
         // Show success message
-        alert(data.message || 'Successfully joined!');
+        toast.success(data.message || 'Successfully joined!');
 
         // Redirect based on user type
         const userType = data.user.user_type;
@@ -125,11 +126,11 @@ export default function JoinPage() {
         }
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'Failed to join. Please try again.');
+        toast.error(errorData.error || 'Failed to join. Please try again.');
       }
     } catch (err: any) {
       console.error('Error joining:', err);
-      alert('Failed to join. Please try again.');
+      toast.error('Failed to join. Please try again.');
     } finally {
       setSubmitting(false);
     }

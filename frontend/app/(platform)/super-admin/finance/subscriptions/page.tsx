@@ -10,49 +10,32 @@ import { useTopbarTitle } from '@/components/platform/TopbarContext';
 import { customFetch } from '@/lib/fetch';
 import { API, SUBSCRIPTION_PLANS } from '@/lib/api';
 
-const planDetails = {
-  'Trial': {
-    description: 'Perfect to explore and test the platform features.',
-    icon: Zap,
-    features: ['Up to 5 Clients limit', 'Basic Case Management', 'Community Support', '1 GB secure storage'],
-    missingFeatures: ['Automated Billing', 'Advanced Reporting', 'API Access', 'White-labeling'],
-    buttonVariant: 'outline',
-    highlighted: false,
-    isPremium: false,
-  },
-  'Basic': {
-    description: 'Essential tools for independent advocates.',
-    icon: Briefcase,
-    features: ['Up to 50 Clients', 'Full Case Management', 'Email Support', '10 GB secure storage', 'Basic Invoicing'],
-    missingFeatures: ['Advanced Reporting', 'API Access', 'White-labeling'],
-    buttonVariant: 'secondary',
-    highlighted: false,
-    isPremium: false,
-  },
-  'Business': {
-    description: 'Comprehensive suite for growing law firms.',
-    icon: Building2,
-    features: ['Unlimited Clients', 'Advanced Case Management', 'Priority 24/7 Support', '100 GB secure storage', 'Automated Billing', 'Advanced Reporting'],
-    missingFeatures: ['White-labeling'],
-    buttonVariant: 'primary',
-    highlighted: true,
-    isPremium: false,
-  },
-  'Enterprise': {
-    description: 'Custom solutions for large legal enterprises.',
-    icon: Crown,
-    features: ['Unlimited Everything', 'Dedicated Account Manager', 'Unlimited secure storage', 'Automated Billing', 'Advanced Custom Reporting', 'Full API Access', 'White-labeling & Custom Domain'],
-    missingFeatures: [],
-    buttonVariant: 'premium',
-    highlighted: false,
-    isPremium: true,
-  }
+const planStyles = {
+  'trial': { icon: Zap, buttonVariant: 'outline', highlighted: false, isPremium: false },
+  'basic': { icon: Briefcase, buttonVariant: 'secondary', highlighted: false, isPremium: false },
+  'business': { icon: Building2, buttonVariant: 'primary', highlighted: true, isPremium: false },
+  'premium': { icon: Crown, buttonVariant: 'premium', highlighted: false, isPremium: true },
+  'enterprise': { icon: Crown, buttonVariant: 'premium', highlighted: false, isPremium: true },
 };
 
-const mergedPlans = SUBSCRIPTION_PLANS.map(plan => ({
-  ...plan,
-  ...(planDetails[plan.name as keyof typeof planDetails] || planDetails['Basic'])
-}));
+const getPlanFeatures = (plan: any) => {
+  const features = [];
+  const missing = [];
+  
+  if (plan.max_users > 0) features.push(`Up to ${plan.max_users} Users`);
+  if (plan.max_clients > 0) features.push(`Up to ${plan.max_clients} Clients`);
+  if (plan.max_cases > 0) features.push(`Up to ${plan.max_cases} Cases`);
+  if (plan.max_storage_gb > 0) features.push(`${plan.max_storage_gb} GB Secure Storage`);
+  if (plan.max_branches > 0) features.push(`Up to ${plan.max_branches} Branches`);
+
+  if (plan.enable_billing) features.push("Automated Billing"); else missing.push("Automated Billing");
+  if (plan.enable_calendar) features.push("Calendar Management"); else missing.push("Calendar Management");
+  if (plan.enable_documents) features.push("Document Management"); else missing.push("Document Management");
+  if (plan.enable_reports) features.push("Advanced Reporting"); else missing.push("Advanced Reporting");
+  if (plan.enable_api_access) features.push("API Access"); else missing.push("API Access");
+
+  return { features, missing };
+};
 
 interface CurrentSubscription {
   plan_name: string;
@@ -73,6 +56,7 @@ export default function SubscriptionsPage() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('monthly');
   const [currentSub, setCurrentSub] = useState<CurrentSubscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchedPlans, setFetchedPlans] = useState<any[]>([]);
 
   // Modal state
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
@@ -88,14 +72,24 @@ export default function SubscriptionsPage() {
   const fetchCurrentSubscription = async () => {
     try {
       setLoading(true);
-      const res = await customFetch(API.SUBSCRIPTIONS.STATUS).catch(() => null);
+      const [statusRes, plansRes] = await Promise.all([
+        customFetch(API.SUBSCRIPTIONS.STATUS).catch(() => null),
+        customFetch(API.SUBSCRIPTIONS.PLANS.LIST).catch(() => null)
+      ]);
       
-      if (res && res.ok) {
-        const statusData = await res.json();
+      let dynamicPlans: any[] = [];
+      if (plansRes && plansRes.ok) {
+        const rawPlans = await plansRes.json();
+        dynamicPlans = Array.isArray(rawPlans) ? rawPlans : (rawPlans.results || []);
+        setFetchedPlans(dynamicPlans.filter((p: any) => p.is_active));
+      }
+      
+      if (statusRes && statusRes.ok) {
+        const statusData = await statusRes.json();
         
-        // Find price from static plans
-        const matchedPlan = SUBSCRIPTION_PLANS.find(p => p.name === statusData.plan_name);
-        const priceString = matchedPlan ? matchedPlan.price : '₹2,499';
+        // Find price from dynamic plans or fallback
+        const matchedPlan = dynamicPlans.find(p => p.name === statusData.plan_name);
+        const priceString = matchedPlan ? `₹${parseFloat(matchedPlan.price).toLocaleString('en-IN')}` : '₹2,499';
         
         // Calculate days left
         let daysLeft = 0;
@@ -109,7 +103,6 @@ export default function SubscriptionsPage() {
         const renewalDateStr = statusData.end_date 
             ? new Date(statusData.end_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
             : 'N/A';
-
         setCurrentSub({
           plan_name: statusData.plan_name || 'Unknown',
           price: priceString,
@@ -220,7 +213,7 @@ export default function SubscriptionsPage() {
                   <div>
                     <p className="text-sm font-bold">Plan Details</p>
                     <p className="text-sm opacity-90">Duration: {billingCycle === 'annually' ? '12 Months' : '1 Month'}</p>
-                    <p className="text-sm opacity-90">Price: {selectedPlan.price} {billingCycle === 'annually' ? '/ year' : '/ month'}</p>
+                    <p className="text-sm opacity-90">Price: ₹{parseFloat(selectedPlan.price).toLocaleString('en-IN')} {billingCycle === 'annually' ? '/ year' : '/ month'}</p>
                   </div>
                 </div>
 
@@ -458,23 +451,30 @@ export default function SubscriptionsPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8 items-start">
-                  {mergedPlans.map((plan, idx) => {
-                    const Icon = plan.icon;
+                  {fetchedPlans.length === 0 ? (
+                    <div className="col-span-full py-20 text-center">
+                      <p className="text-slate-400 font-bold">No active plans available right now.</p>
+                    </div>
+                  ) : fetchedPlans.map((plan, idx) => {
+                    const styleMeta = planStyles[(plan.plan_type || 'basic').toLowerCase() as keyof typeof planStyles] || planStyles['basic'];
+                    const Icon = styleMeta.icon;
+                    const { features, missing } = getPlanFeatures(plan);
+                    
                     return (
                       <motion.div
-                        key={plan.name}
+                        key={plan.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: idx * 0.1 }}
-                        className={`relative rounded-[2rem] p-8 flex flex-col h-full bg-white transition-all duration-300 hover:-translate-y-2 hover:shadow-xl ${plan.highlighted
+                        className={`relative rounded-[2rem] p-8 flex flex-col h-full bg-white transition-all duration-300 hover:-translate-y-2 hover:shadow-xl ${styleMeta.highlighted
                           ? 'ring-2 ring-blue-600 shadow-blue-900/5 shadow-2xl scale-[1.02] z-10'
-                          : plan.isPremium
+                          : styleMeta.isPremium
                             ? 'bg-gradient-to-b from-[#0f172a] to-[#1e293b] text-white shadow-xl'
                             : 'border border-slate-100 shadow-sm'
                           }`}
                       >
                         {/* Popular Badge */}
-                        {plan.highlighted && (
+                        {styleMeta.highlighted && (
                           <div className="absolute -top-4 left-0 right-0 flex justify-center">
                             <span className="bg-blue-600 text-white text-xs font-black uppercase tracking-widest py-1.5 px-4 rounded-full flex items-center gap-1 shadow-lg shadow-blue-600/30">
                               <Sparkles className="w-3.5 h-3.5" /> Most Popular
@@ -484,15 +484,15 @@ export default function SubscriptionsPage() {
 
                         <div className="mb-6 flex justify-between items-start">
                           <div>
-                            <h3 className={`text-xl font-black ${plan.isPremium ? 'text-white' : 'text-slate-900'}`}>
+                            <h3 className={`text-xl font-black ${styleMeta.isPremium ? 'text-white' : 'text-slate-900'}`}>
                               {plan.name}
                             </h3>
-                            <p className={`text-sm mt-2 leading-relaxed ${plan.isPremium ? 'text-slate-400' : 'text-slate-500 font-medium'}`}>
-                              {plan.description}
+                            <p className={`text-sm mt-2 leading-relaxed ${styleMeta.isPremium ? 'text-slate-400' : 'text-slate-500 font-medium'}`}>
+                              {plan.description || "A powerful plan for your firm."}
                             </p>
                           </div>
-                          <div className={`p-3 rounded-2xl ${plan.highlighted ? 'bg-blue-50 text-blue-600' :
-                            plan.isPremium ? 'bg-slate-800 text-slate-300' :
+                          <div className={`p-3 rounded-2xl ${styleMeta.highlighted ? 'bg-blue-50 text-blue-600' :
+                            styleMeta.isPremium ? 'bg-slate-800 text-slate-300' :
                               'bg-slate-50 text-slate-400'
                             }`}>
                             <Icon className="w-6 h-6" />
@@ -501,29 +501,29 @@ export default function SubscriptionsPage() {
 
                         <div className="mb-8">
                           <div className="flex items-end gap-1.5">
-                            <span className={`text-4xl font-black tracking-tight ${plan.isPremium ? 'text-white' : 'text-slate-900'}`}>
-                              {plan.price}
+                            <span className={`text-4xl font-black tracking-tight ${styleMeta.isPremium ? 'text-white' : 'text-slate-900'}`}>
+                              ₹{parseFloat(plan.price).toLocaleString('en-IN')}
                             </span>
-                            <span className={`text-sm font-bold pb-1 ${plan.isPremium ? 'text-slate-400' : 'text-slate-400'}`}>
-                              /{plan.period}
+                            <span className={`text-sm font-bold pb-1 ${styleMeta.isPremium ? 'text-slate-400' : 'text-slate-400'}`}>
+                              /{plan.billing_cycle || 'month'}
                             </span>
                           </div>
                         </div>
 
                         <div className="flex-1 space-y-4 mb-8">
-                          {plan.features.map((feature, i) => (
+                          {features.map((feature, i) => (
                             <div key={i} className="flex items-start gap-3">
-                              <CheckCircle2 className={`w-5 h-5 shrink-0 ${plan.isPremium ? 'text-emerald-400' : 'text-emerald-500'}`} />
-                              <span className={`text-sm font-semibold ${plan.isPremium ? 'text-slate-200' : 'text-slate-700'}`}>
+                              <CheckCircle2 className={`w-5 h-5 shrink-0 ${styleMeta.isPremium ? 'text-emerald-400' : 'text-emerald-500'}`} />
+                              <span className={`text-sm font-semibold ${styleMeta.isPremium ? 'text-slate-200' : 'text-slate-700'}`}>
                                 {feature}
                               </span>
                             </div>
                           ))}
 
-                          {plan.missingFeatures.map((feature, i) => (
+                          {missing.map((feature, i) => (
                             <div key={`missing-${i}`} className="flex items-start gap-3 opacity-50">
                               <X className="w-5 h-5 shrink-0 text-slate-300" />
-                              <span className={`text-sm font-semibold line-through ${plan.isPremium ? 'text-slate-400' : 'text-slate-400'}`}>
+                              <span className={`text-sm font-semibold line-through ${styleMeta.isPremium ? 'text-slate-400' : 'text-slate-400'}`}>
                                 {feature}
                               </span>
                             </div>
@@ -539,14 +539,14 @@ export default function SubscriptionsPage() {
                             }
                           }}
                           className={`w-full py-4 px-6 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 hover:scale-[1.02]
-                            ${plan.buttonVariant === 'primary' ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20' : ''}
-                            ${plan.buttonVariant === 'secondary' ? 'bg-slate-100 hover:bg-slate-200 text-slate-900' : ''}
-                            ${plan.buttonVariant === 'outline' ? 'bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-700' : ''}
-                            ${plan.buttonVariant === 'premium' ? 'bg-white hover:bg-slate-100 text-slate-900 shadow-xl' : ''}
+                            ${styleMeta.buttonVariant === 'primary' ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20' : ''}
+                            ${styleMeta.buttonVariant === 'secondary' ? 'bg-slate-100 hover:bg-slate-200 text-slate-900' : ''}
+                            ${styleMeta.buttonVariant === 'outline' ? 'bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-700' : ''}
+                            ${styleMeta.buttonVariant === 'premium' ? 'bg-white hover:bg-slate-100 text-slate-900 shadow-xl' : ''}
                           `}
                         >
                           {plan.name === currentSub?.plan_name ? 'Current Plan' : `Get ${plan.name}`}
-                          <ChevronRight className={`w-4 h-4 ${plan.buttonVariant === 'outline' ? 'text-slate-400' : ''}`} />
+                          <ChevronRight className={`w-4 h-4 ${styleMeta.buttonVariant === 'outline' ? 'text-slate-400' : ''}`} />
                         </button>
                       </motion.div>
                     );

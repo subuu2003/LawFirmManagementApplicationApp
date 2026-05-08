@@ -10,6 +10,7 @@ import {
   ChevronDown, Calendar, User, Briefcase, Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 
 interface Client {
   id: string; // client profile UUID
@@ -219,8 +220,8 @@ export default function CreateInvoicePage() {
   const total = subtotal + taxAmount - discountAmount;
 
   const handleSubmit = async () => {
-    if (!selectedClient) return alert("Please select a client");
-    if (subtotal <= 0) return alert("Invoice amount must be greater than zero");
+    if (!selectedClient) return toast.error("Please select a client");
+    if (subtotal <= 0) return toast.error("Invoice amount must be greater than zero");
 
     setIsSubmitting(true);
     try {
@@ -282,11 +283,11 @@ export default function CreateInvoicePage() {
       } else {
         const error = await res.json();
         console.error(error);
-        alert(isEditMode ? 'Error updating invoice' : 'Error creating invoice');
+        toast.error(isEditMode ? 'Error updating invoice' : 'Error creating invoice');
       }
     } catch (err) {
       console.error(err);
-      alert('Submission failed');
+      toast.error('Submission failed');
     } finally {
       setIsSubmitting(false);
     }

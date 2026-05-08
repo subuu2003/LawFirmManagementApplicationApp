@@ -5,6 +5,7 @@ import { useTopbarTitle } from '@/components/platform/TopbarContext';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 import InvoiceViewModal from '@/components/InvoiceViewModal';
+import { toast } from 'react-hot-toast';
 import {
   FileText, Search, IndianRupee, Clock, CheckCircle2,
   AlertCircle, ChevronLeft, ChevronRight, Loader2, CreditCard,
@@ -102,12 +103,12 @@ export default function ClientInvoicesPage() {
         }),
       });
       if (res.ok) {
-        alert('Payment recorded successfully!');
+        toast.success('Payment recorded successfully!');
         fetchInvoices();
         if (selected?.id === inv.id) setSelected({ ...selected, status: 'paid' });
       } else {
         const err = await res.json();
-        alert(err.error || 'Payment failed');
+        toast.error(err.error || 'Payment failed');
       }
     } finally {
       setPaying(false);

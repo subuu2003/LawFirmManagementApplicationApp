@@ -12,6 +12,7 @@ import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 
 interface Expense {
   id: string;
@@ -74,7 +75,7 @@ export default function ExpensesPage() {
         if (selectedExpense?.id === id) setSelectedExpense(null);
       }
     } catch (err) {
-      alert("Failed to delete expense");
+      toast.error("Failed to delete expense");
     }
   };
 
@@ -109,7 +110,7 @@ export default function ExpensesPage() {
         fetchExpenses();
       }
     } catch (err) {
-      alert("Failed to update expense");
+      toast.error("Failed to update expense");
     }
   };
 

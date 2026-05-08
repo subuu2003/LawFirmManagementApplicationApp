@@ -6,6 +6,7 @@ import { ToggleLeft, ToggleRight, Loader2, Save, ChevronDown } from 'lucide-reac
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 import { SettingsPageTemplate } from '@/components/platform/page-templates';
+import { toast } from 'react-hot-toast';
 
 export default function PlatformOwnerSettingsPage() {
   const accent = "#0e2340";
@@ -55,13 +56,13 @@ export default function PlatformOwnerSettingsPage() {
           is_free_trial_enabled: data.is_free_trial_enabled,
           trial_period_days: data.trial_period_days
         });
-        alert("Platform settings updated successfully!");
+        toast.success("Platform settings updated successfully!");
       } else {
-        alert("Failed to update platform settings.");
+        toast.error("Failed to update platform settings.");
       }
     } catch (error) {
       console.error("Update failed:", error);
-      alert("An error occurred while updating settings.");
+      toast.error("An error occurred while updating settings.");
     } finally {
       setSaving(false);
     }
