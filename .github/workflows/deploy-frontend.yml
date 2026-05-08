@@ -1,0 +1,48 @@
+name: Build Frontend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+      
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+      
+      - name: Create deployment package
+        run: |
+          tar -czf frontend-build.tar.gz \
+            frontend/.next \
+            frontend/public \
+            frontend/package.json \
+            frontend/package-lock.json \
+            frontend/next.config.ts
+      
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: frontend-build.tar.gz
+          retention-days: 7
