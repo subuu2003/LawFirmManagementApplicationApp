@@ -15,21 +15,172 @@ from .serializers import (
 from .utils import get_subscription_status, can_add_user, can_add_client, can_add_case, can_add_branch
 
 class SubscriptionPlanViewSet(viewsets.ModelViewSet):
-    """ViewSet for managing subscription plans (Platform Owner only)"""
+    """
+    ViewSet for managing subscription plans (Platform Owner only)
+    
+    Endpoints:
+    - GET /api/subscriptions/plans/ - List all plans
+    - GET /api/subscriptions/plans/{id}/ - Get plan details
+    - POST /api/subscriptions/plans/ - Create new plan (Platform Owner only)
+    - PUT/PATCH /api/subscriptions/plans/{id}/ - Update plan (Platform Owner only)
+    - DELETE /api/subscriptions/plans/{id}/ - Delete plan (Platform Owner only)
+    """
     queryset = SubscriptionPlan.objects.all()
     serializer_class = SubscriptionPlanSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        """
+        Platform Owner sees all plans
+        Others see only active plans
+        """
+        if self.request.user.user_type == 'platform_owner':
+            return SubscriptionPlan.objects.all()
+        return SubscriptionPlan.objects.filter(is_active=True)
+
     def get_permissions(self):
+        """
+        List and retrieve are available to all authenticated users
+        Create, update, delete are only for Platform Owner
+        """
         if self.action in ['list', 'retrieve']:
             return [permissions.IsAuthenticated()]
-        # Only platform owner can create/update plans
-        return [permissions.IsAuthenticated()] # Simplified for now, logic below
+        return [permissions.IsAuthenticated()]
 
     def create(self, request, *args, **kwargs):
+        """Create a new subscription plan (Platform Owner only)"""
         if request.user.user_type != 'platform_owner':
-            return Response({'error': 'Only Platform Owner can create plans'}, status=status.HTTP_403_FORBIDDEN)
-        return super().create(request, *args, **kwargs)
+            return Response(
+                {'error': 'Only Platform Owner can create subscription plans'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        # Log the action
+        from audit.models import AuditLog
+        AuditLog.objects.create(
+            user=request.user,
+            action='create_plan',
+            resource_type='subscription_plan',
+            resource_id=str(serializer.instance.id),
+            description=f"Created subscription plan: {serializer.instance.name}"
+        )
+        
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        """Update a subscription plan (Platform Owner only)"""
+        if request.user.user_type != 'platform_owner':
+            return Response(
+                {'error': 'Only Platform Owner can update subscription plans'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        # Log the action
+        from audit.models import AuditLog
+        AuditLog.objects.create(
+            user=request.user,
+            action='update_plan',
+            resource_type='subscription_plan',
+            resource_id=str(instance.id),
+            description=f"Updated subscription plan: {instance.name}"
+        )
+        
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Delete/deactivate a subscription plan (Platform Owner only)
+        
+        Note: Instead of hard delete, we mark the plan as inactive
+        to preserve historical data for existing subscriptions
+        """
+        if request.user.user_type != 'platform_owner':
+            return Response(
+                {'error': 'Only Platform Owner can delete subscription plans'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        instance = self.get_object()
+        
+        # Check if any active subscriptions are using this plan
+        active_subscriptions = FirmSubscription.objects.filter(
+            plan=instance,
+            status='active'
+        ).count()
+        
+        if active_subscriptions > 0:
+            return Response(
+                {
+                    'error': f'Cannot delete plan. {active_subscriptions} active subscription(s) are using this plan.',
+                    'active_subscriptions': active_subscriptions,
+                    'suggestion': 'Deactivate the plan instead by setting is_active=false'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Soft delete - mark as inactive instead of hard delete
+        instance.is_active = False
+        instance.save()
+        
+        # Log the action
+        from audit.models import AuditLog
+        AuditLog.objects.create(
+            user=request.user,
+            action='delete_plan',
+            resource_type='subscription_plan',
+            resource_id=str(instance.id),
+            description=f"Deactivated subscription plan: {instance.name}"
+        )
+        
+        return Response(
+            {
+                'message': f'Subscription plan "{instance.name}" has been deactivated',
+                'plan_id': str(instance.id)
+            },
+            status=status.HTTP_200_OK
+        )
+    
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        """Reactivate a deactivated plan (Platform Owner only)"""
+        if request.user.user_type != 'platform_owner':
+            return Response(
+                {'error': 'Only Platform Owner can activate subscription plans'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        instance = self.get_object()
+        instance.is_active = True
+        instance.save()
+        
+        # Log the action
+        from audit.models import AuditLog
+        AuditLog.objects.create(
+            user=request.user,
+            action='activate_plan',
+            resource_type='subscription_plan',
+            resource_id=str(instance.id),
+            description=f"Activated subscription plan: {instance.name}"
+        )
+        
+        return Response(
+            {
+                'message': f'Subscription plan "{instance.name}" has been activated',
+                'plan': self.get_serializer(instance).data
+            },
+            status=status.HTTP_200_OK
+        )
 
 class FirmSubscriptionViewSet(viewsets.ModelViewSet):
     """ViewSet for managing firm subscriptions"""
@@ -208,11 +359,72 @@ class FirmSubscriptionViewSet(viewsets.ModelViewSet):
             description=f"Subscription upgraded from {old_plan} to {plan.name} for {duration_months} month(s). Payment: {payment_method} ref: {payment_reference}"
         )
 
+        # ============================================================================
+        # AUTO-GENERATE PLATFORM INVOICE
+        # ============================================================================
+        from decimal import Decimal
+        
+        # Calculate invoice amount based on plan price and duration
+        monthly_price = Decimal(plan.price)
+        total_amount = monthly_price * duration_months
+        
+        # Apply discount for longer durations
+        discount_percentage = Decimal('0')
+        if duration_months == 3:
+            discount_percentage = Decimal('5')  # 5% off for 3 months
+        elif duration_months == 6:
+            discount_percentage = Decimal('10')  # 10% off for 6 months
+        elif duration_months == 12:
+            discount_percentage = Decimal('15')  # 15% off for 12 months
+        
+        discount_amount = (total_amount * discount_percentage) / Decimal('100')
+        final_amount = total_amount - discount_amount
+        
+        # Generate invoice number
+        invoice_count = PlatformInvoice.objects.count() + 1
+        invoice_number = f"SUB-{timezone.now().year}-{invoice_count:05d}"
+        
+        # Create platform invoice
+        platform_invoice = PlatformInvoice.objects.create(
+            firm=firm,
+            subscription_plan=plan,
+            invoice_number=invoice_number,
+            invoice_date=timezone.now().date(),
+            due_date=(timezone.now() + timedelta(days=30)).date(),
+            billing_period_start=timezone.now().date(),
+            billing_period_end=new_end_date.date(),
+            subtotal=total_amount,
+            discount_percentage=discount_percentage,
+            discount_amount=discount_amount,
+            total_amount=final_amount,
+            balance_due=final_amount,
+            status='sent',  # Automatically mark as sent
+            payment_method=payment_method,
+            payment_reference=payment_reference,
+            notes=f"Subscription upgrade to {plan.name} plan - {duration_months} month(s)"
+        )
+        
+        # Log invoice creation
+        AuditLog.objects.create(
+            user=user, firm=firm,
+            action='create_invoice',
+            resource_type='platform_invoice',
+            resource_id=str(platform_invoice.id),
+            description=f"Auto-generated invoice {invoice_number} for subscription upgrade - Amount: ₹{final_amount}"
+        )
+
         serializer = self.get_serializer(subscription)
         return Response({
             'message': f'Subscription upgraded to "{plan.name}" successfully for {duration_months} month(s)',
             'subscription': serializer.data,
             'new_end_date': new_end_date,
+            'invoice': {
+                'id': str(platform_invoice.id),
+                'invoice_number': platform_invoice.invoice_number,
+                'total_amount': float(final_amount),
+                'due_date': platform_invoice.due_date.isoformat(),
+                'status': platform_invoice.status
+            }
         }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'])
@@ -352,11 +564,72 @@ class FirmSubscriptionViewSet(viewsets.ModelViewSet):
             description=f"Subscription activated with plan '{plan.name}' for {duration_months} month(s). New end: {new_end_date.isoformat()}"
         )
 
+        # ============================================================================
+        # AUTO-GENERATE PLATFORM INVOICE
+        # ============================================================================
+        from decimal import Decimal
+        import random
+        import string
+        
+        # Calculate invoice amount based on plan price and duration
+        monthly_price = Decimal(plan.price)
+        total_amount = monthly_price * duration_months
+        
+        # Apply discount for longer durations
+        discount_percentage = Decimal('0')
+        if duration_months == 3:
+            discount_percentage = Decimal('5')  # 5% off for 3 months
+        elif duration_months == 6:
+            discount_percentage = Decimal('10')  # 10% off for 6 months
+        elif duration_months == 12:
+            discount_percentage = Decimal('15')  # 15% off for 12 months
+        
+        discount_amount = (total_amount * discount_percentage) / Decimal('100')
+        final_amount = total_amount - discount_amount
+        
+        # Generate invoice number
+        invoice_count = PlatformInvoice.objects.count() + 1
+        invoice_number = f"SUB-{timezone.now().year}-{invoice_count:05d}"
+        
+        # Create platform invoice
+        platform_invoice = PlatformInvoice.objects.create(
+            firm=firm,
+            subscription_plan=plan,
+            invoice_number=invoice_number,
+            invoice_date=timezone.now().date(),
+            due_date=(timezone.now() + timedelta(days=30)).date(),
+            billing_period_start=timezone.now().date(),
+            billing_period_end=new_end_date.date(),
+            subtotal=total_amount,
+            discount_percentage=discount_percentage,
+            discount_amount=discount_amount,
+            total_amount=final_amount,
+            balance_due=final_amount,
+            status='sent',  # Automatically mark as sent
+            notes=f"Subscription invoice for {plan.name} plan - {duration_months} month(s)"
+        )
+        
+        # Log invoice creation
+        AuditLog.objects.create(
+            user=request.user, firm=firm,
+            action='create_invoice',
+            resource_type='platform_invoice',
+            resource_id=str(platform_invoice.id),
+            description=f"Auto-generated invoice {invoice_number} for subscription activation - Amount: ₹{final_amount}"
+        )
+
         serializer = self.get_serializer(subscription)
         return Response({
             'message': f'Subscription activated with "{plan.name}" plan for {duration_months} month(s)',
             'subscription': serializer.data,
             'new_end_date': new_end_date,
+            'invoice': {
+                'id': str(platform_invoice.id),
+                'invoice_number': platform_invoice.invoice_number,
+                'total_amount': float(final_amount),
+                'due_date': platform_invoice.due_date.isoformat(),
+                'status': platform_invoice.status
+            }
         })
 
     @action(detail=False, methods=['post'])

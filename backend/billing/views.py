@@ -277,6 +277,141 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(invoice)
         return Response(serializer.data)
     
+    @action(detail=False, methods=['post'])
+    def generate_from_case(self, request):
+        """
+        Generate invoice with automatic advocate and time entries from case
+        
+        POST /api/billing/invoices/generate_from_case/
+        {
+            "case_id": "uuid",
+            "include_unbilled_time_entries": true,
+            "include_unbilled_expenses": true
+        }
+        
+        Returns invoice data pre-populated with:
+        - Advocate from case
+        - Unbilled time entries for that case
+        - Unbilled expenses for that case
+        - Calculated totals
+        """
+        case_id = request.data.get('case_id')
+        if not case_id:
+            return Response({'error': 'case_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        from cases.models import Case
+        try:
+            case = Case.objects.get(id=case_id)
+        except Case.DoesNotExist:
+            return Response({'error': 'Case not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check permissions
+        user = request.user
+        if user.user_type not in ['super_admin', 'admin', 'advocate']:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if user.user_type in ['super_admin', 'admin'] and case.firm != user.firm:
+            return Response({'error': 'Case not in your firm'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get advocate from case
+        advocate = case.assigned_advocate
+        if not advocate:
+            return Response({'error': 'No advocate assigned to this case'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get unbilled time entries
+        include_time = request.data.get('include_unbilled_time_entries', True)
+        include_expenses = request.data.get('include_unbilled_expenses', True)
+        
+        time_entries = []
+        time_total = Decimal('0')
+        if include_time:
+            unbilled_time = TimeEntry.objects.filter(
+                case=case,
+                invoice__isnull=True,
+                billable=True,
+                status='approved'
+            ).select_related('user')
+            
+            for entry in unbilled_time:
+                time_entries.append({
+                    'id': str(entry.id),
+                    'date': entry.date.isoformat(),
+                    'user': entry.user.get_full_name() or entry.user.email,
+                    'description': entry.description,
+                    'hours': float(entry.hours),
+                    'rate': float(entry.hourly_rate),
+                    'amount': float(entry.amount)
+                })
+                time_total += entry.amount
+        
+        # Get unbilled expenses
+        expenses = []
+        expense_total = Decimal('0')
+        if include_expenses:
+            unbilled_expenses = Expense.objects.filter(
+                case=case,
+                invoice__isnull=True,
+                billable=True,
+                status='approved'
+            ).select_related('submitted_by')
+            
+            for expense in unbilled_expenses:
+                expenses.append({
+                    'id': str(expense.id),
+                    'date': expense.date.isoformat(),
+                    'submitted_by': expense.submitted_by.get_full_name() or expense.submitted_by.email,
+                    'expense_type': expense.expense_type,
+                    'description': expense.description,
+                    'amount': float(expense.billable_amount)
+                })
+                expense_total += expense.billable_amount
+        
+        # Calculate totals
+        subtotal = time_total + expense_total
+        tax_percentage = Decimal('18')  # Default GST
+        tax_amount = (subtotal * tax_percentage) / Decimal('100')
+        total_amount = subtotal + tax_amount
+        
+        # Generate invoice description
+        description = f"Legal services for case: {case.case_title}\n"
+        description += f"Case Number: {case.case_number}\n"
+        description += f"Advocate: {advocate.get_full_name() or advocate.email}\n"
+        if time_entries:
+            description += f"Time Entries: {len(time_entries)} entries, {sum(e['hours'] for e in time_entries):.2f} hours\n"
+        if expenses:
+            description += f"Expenses: {len(expenses)} items\n"
+        
+        return Response({
+            'case': {
+                'id': str(case.id),
+                'case_title': case.case_title,
+                'case_number': case.case_number
+            },
+            'client': {
+                'id': str(case.client.id),
+                'name': case.client.get_full_name(),
+                'email': case.client.email
+            },
+            'advocate': {
+                'id': str(advocate.id),
+                'name': advocate.get_full_name() or advocate.email,
+                'email': advocate.email
+            },
+            'time_entries': time_entries,
+            'expenses': expenses,
+            'suggested_invoice': {
+                'case_id': str(case.id),
+                'client_id': str(case.client.id),
+                'notes': description,
+                'subtotal': float(subtotal),
+                'tax_percentage': float(tax_percentage),
+                'tax_amount': float(tax_amount),
+                'total_amount': float(total_amount),
+                'balance_due': float(total_amount),
+                'due_date': (timezone.now() + timedelta(days=30)).date().isoformat()
+            }
+        })
+    
     @action(detail=False, methods=['get'])
     def my_invoices(self, request):
         """

@@ -1803,8 +1803,11 @@ class FirmJoinLinkViewSet(viewsets.ModelViewSet):
                 'is_valid': False
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Handle solo advocates (no firm)
+        firm_name = link.firm.firm_name if link.firm else "Solo Advocate"
+        
         return Response({
-            'firm_name': link.firm.firm_name,
+            'firm_name': firm_name,
             'user_type': link.user_type,
             'user_type_display': link.get_user_type_display(),
             'expires_at': link.expires_at,
