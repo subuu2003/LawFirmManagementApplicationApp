@@ -41,23 +41,17 @@ jobs:
             frontend/next.config.ts
       
       - name: Deploy to server
-        uses: appleboy/scp-action@master
-        with:
-          host: 157.245.101.58
-          username: sammy
-          password: ${{ secrets.SERVER_PASSWORD }}
-          source: "frontend-build.tar.gz"
-          target: "/home/sammy/LawFirmManagementApplicationApp"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no frontend-build.tar.gz sammy@157.245.101.58:/home/sammy/LawFirmManagementApplicationApp/
       
       - name: Extract and restart
-        uses: appleboy/ssh-action@master
-        with:
-          host: 157.245.101.58
-          username: sammy
-          password: ${{ secrets.SERVER_PASSWORD }}
-          script: |
+        run: |
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no sammy@157.245.101.58 << 'EOF'
             cd /home/sammy/LawFirmManagementApplicationApp
             tar -xzf frontend-build.tar.gz
             rm frontend-build.tar.gz
             cd frontend
             pm2 restart lawfirm-frontend
+          EOF
