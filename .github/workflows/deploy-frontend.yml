@@ -47,7 +47,7 @@ jobs:
           username: sammy
           password: ${{ secrets.SERVER_PASSWORD }}
           source: "frontend-build.tar.gz"
-          target: "/home/sammy/LawFirmProject"
+          target: "/home/sammy/LawFirmManagementApplicationApp"
       
       - name: Extract and restart
         uses: appleboy/ssh-action@master
@@ -56,7 +56,7 @@ jobs:
           username: sammy
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
-            cd /home/sammy/LawFirmProject
+            cd /home/sammy/LawFirmManagementApplicationApp
             tar -xzf frontend-build.tar.gz
             rm frontend-build.tar.gz
             cd frontend
