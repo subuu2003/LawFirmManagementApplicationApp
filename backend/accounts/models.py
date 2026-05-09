@@ -257,7 +257,12 @@ class FirmJoinLink(models.Model):
         ]
     
     def __str__(self):
-        firm_name = self.firm.firm_name if self.firm else "Solo Advocate"
+        if self.firm:
+            firm_name = self.firm.firm_name
+        else:
+            # For solo advocates, show the advocate's name
+            advocate_name = self.created_by.get_full_name() if self.created_by else "Independent Advocate"
+            firm_name = f"{advocate_name}'s Practice"
         return f"Join Link: {firm_name} - {self.get_user_type_display()}"
     
     def is_valid(self):
