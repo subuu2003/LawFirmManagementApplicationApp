@@ -56,8 +56,8 @@ export default function RegisterWizard() {
   const stepsList = registerType === 'client'
     ? ["Account Type", "Personal Details", "Address Data", "Security & Access"]
     : registerType === 'advocate'
-    ? ["Account Type", "Professional Identification", "Personal Details", "Address Data", "Security & Access"]
-    : ["Account Type", "Personal Details", "Law Firm Profile", "Address Data", "Security & Access"];
+      ? ["Account Type", "Professional Identification", "Personal Details", "Address Data", "Security & Access"]
+      : ["Account Type", "Personal Details", "Law Firm Profile", "Address Data", "Security & Access"];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     let { name, value } = e.target;
@@ -185,7 +185,7 @@ export default function RegisterWizard() {
                 <Briefcase className="w-6 h-6" />
               </div>
               <h3 className={`text-lg font-bold ${registerType === 'advocate' ? 'text-[#0e2340]' : 'text-gray-900'}`}>Advocate Account</h3>
-              <p className="text-sm text-gray-500 mt-2 leading-relaxed">Independent practitioners managing multiple firms, cases, and digital client notes.</p>
+              <p className="text-sm text-gray-500 mt-2 leading-relaxed">Independent Lawyers for multiple firms, cases, and digital client notes.</p>
             </button>
             {trialEnabled && (
               <button
@@ -562,7 +562,7 @@ export default function RegisterWizard() {
               <p className="text-gray-600 font-medium text-lg">New law firm registrations are currently disabled by the platform administrator.</p>
               <p className="text-gray-500 text-sm">Please contact the platform owner for more information or to request access.</p>
               <div className="pt-4">
-                <Link 
+                <Link
                   href="/login"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg text-[15px] font-bold text-white bg-[#0e2340] hover:bg-[#1a3a5c] transition-all"
                 >

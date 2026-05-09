@@ -1,5 +1,7 @@
-import { CaseDetailPage } from '@/components/platform/page-templates';
+'use client';
+
+import { CaseWorkspace } from '@/components/platform/CaseWorkspace';
 
 export default function FirmAdminCaseDetailPage() {
-  return <CaseDetailPage accent="#2a4365" roleTitle="Firm Admin" allowApprovals />;
+  return <CaseWorkspace viewBase="/firm-admin/cases" />;
 }

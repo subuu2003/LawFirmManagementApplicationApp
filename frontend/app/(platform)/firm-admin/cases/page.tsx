@@ -7,6 +7,8 @@ export default function FirmAdminCasesPage() {
       title="Admin Case Operations"
       description="Assign cases, monitor hearing history, review document flow, and manage operational updates."
       viewBase="/firm-admin/cases"
+      primaryHref="/firm-admin/cases/new"
+      primaryLabel="Create New Case"
     />
   );
 }

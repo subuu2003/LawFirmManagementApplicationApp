@@ -50,7 +50,13 @@ const STEPS = [
   { id: 'economics', title: 'Finalize', description: 'Financials & Docs', icon: FileCheck },
 ];
 
-export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pre_litigation' | 'court_case' }) {
+export default function CaseAddForm({ 
+  initialCategory,
+  redirectBase = '/super-admin/cases'
+}: { 
+  initialCategory?: 'pre_litigation' | 'court_case',
+  redirectBase?: string
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -117,6 +123,7 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isAdvocate, setIsAdvocate] = useState(false);
+  const [isFirmAdmin, setIsFirmAdmin] = useState(false);
 
   // Get current user details
   useEffect(() => {
@@ -126,6 +133,7 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
         const user = JSON.parse(userStr);
         setCurrentUser(user);
         setIsAdvocate(user.user_type === 'advocate');
+        setIsFirmAdmin(user.user_type === 'admin');
         
         // If user is advocate, auto-assign them
         if (user.user_type === 'advocate' && user.id) {
@@ -187,12 +195,34 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
           });
         };
 
+        const branchOptions = formatUser(branchesData);
         setOptions({
           clients: isAdvocate ? formatClients(clientsData) : formatUser(clientsData),
           advocates: formatUser(advocatesData),
           paralegals: formatUser(paralegalsData),
-          branches: formatUser(branchesData)
+          branches: branchOptions
         });
+
+        // Auto-select branch
+        if (!form.branch && branchOptions.length > 0) {
+          // 1. Check if user has an assigned branch in their details
+          const userBranchId = currentUser?.branch_id || 
+                             currentUser?.branch ||
+                             currentUser?.branch_uuid ||
+                             currentUser?.available_firms?.find((m: any) => m.is_active || m.branch)?.branch ||
+                             currentUser?.available_firms?.find((m: any) => m.is_active)?.branch_id;
+          
+          if (userBranchId) {
+            const match = branchOptions.find(b => b.value === userBranchId);
+            if (match) {
+              setForm(p => ({ ...p, branch: match.value }));
+            }
+          } 
+          // 2. Fallback: Auto-select if only one branch exists
+          else if (branchOptions.length === 1) {
+            setForm(p => ({ ...p, branch: branchOptions[0].value }));
+          }
+        }
       } catch (err: any) {
         console.error("Fetch error:", err);
         setError("Failed to load necessary form data. Please try again.");
@@ -324,7 +354,7 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
       setSuccess(true);
       setTimeout(() => {
         // Redirect to the detail page of the newly created case
-        router.push(`/super-admin/cases/${data.id || data.uuid}`);
+        router.push(`${redirectBase}/${data.id || data.uuid}`);
       }, 1500);
     } catch (err: any) {
       setError(err.message);
@@ -578,13 +608,23 @@ export default function CaseAddForm({ initialCategory }: { initialCategory?: 'pr
                       <select
                         value={form.branch}
                         onChange={e => set('branch', e.target.value)}
-                        className="h-11 w-full appearance-none rounded-xl border border-gray-100 bg-gray-50/50 pl-11 pr-10 text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-[#0e2340] transition-all"
+                        disabled={isFirmAdmin && !!form.branch}
+                        className={`h-11 w-full appearance-none rounded-xl border border-gray-100 pl-11 pr-10 text-sm font-semibold text-gray-800 outline-none transition-all ${
+                          (isFirmAdmin && !!form.branch) 
+                            ? 'bg-gray-100 cursor-not-allowed opacity-75' 
+                            : 'bg-gray-50/50 focus:bg-white focus:border-[#0e2340]'
+                        }`}
                       >
                         <option value="">Select Branch</option>
                         {options.branches.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
                       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                     </div>
+                    {isFirmAdmin && form.branch && (
+                      <p className="text-[10px] text-gray-400 mt-1 font-medium italic">
+                        Matter locked to your assigned branch
+                      </p>
+                    )}
                   </div>
                   )}
                 </div>

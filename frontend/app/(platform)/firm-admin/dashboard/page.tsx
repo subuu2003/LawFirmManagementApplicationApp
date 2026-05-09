@@ -3,68 +3,67 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Briefcase, Users, FileText, CheckSquare, ArrowRight,
+  Briefcase, Users, FileText, ArrowRight,
   Calendar, Building2, UserCheck, Clock,
-  CheckCircle2, Loader2, AlertCircle,
+  Loader2, AlertCircle, Bell, ChevronDown,
+  History, ShieldCheck, LogOut, ReceiptText, UserPlus, LogIn
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 
-// ─── PALETTE ────────────────────────────────────────────────────────────────
-const BRAND    = '#2a4365';
-const BRAND_L  = '#3b6194';
-const GREEN    = '#16A34A';
-const BLUE     = '#2563EB';
-const SLATE    = '#64748B';
-const PURPLE   = '#7C3AED';
-const AMBER    = '#F59E0B';
+// ─── STYLING CONSTANTS ──────────────────────────────────────────────────────
+const BLUE_GRADIENT = 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)';
+const ICON_COLORS = {
+  clients: '#22C55E',
+  documents: '#8B5CF6',
+  team: '#F97316',
+  pending: '#EAB308',
+  upcoming: '#3B82F6',
+};
 
 // ─── TYPES ──────────────────────────────────────────────────────────────────
+interface Activity {
+  action: string;
+  description: string;
+  created_at: string;
+  user__email: string;
+}
+
 interface DashboardData {
   role: string;
   role_display: string;
   user_name: string;
+  user_id: string;
   cards: {
-    total_cases: {
-      total: number;
-      running: number;
-      disposed: number;
-      closed: number;
-    };
+    total_cases: { total: number; running: number; disposed: number; closed: number };
     total_clients: number;
     total_documents: number;
     team_members: number;
-    todos: {
-      pending: number;
-      upcoming: number;
-    };
+    todos: { pending: number; upcoming: number };
   };
-  firm_info: {
-    name: string;
-    code: string;
-    subscription: string;
-    practice_areas: string[];
-  };
+  firm_info: { name: string; code: string; subscription: string };
+  branch_info: { name: string; code: string; city: string; state: string; phone_number: string; email: string };
+  recent_activity: Activity[];
 }
 
-// ─── TOOLTIP ────────────────────────────────────────────────────────────────
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', fontFamily: 'inherit' }}>
-      <p style={{ fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 6 }}>{label}</p>
-      {payload.map((p: any, i: number) => (
-        <p key={i} style={{ fontSize: 12, color: p.color || BRAND, margin: '2px 0' }}>
-          <span style={{ color: '#64748b' }}>{p.name}: </span>
-          <span style={{ fontWeight: 600 }}>{p.value}</span>
-        </p>
-      ))}
-    </div>
-  );
+// ─── HELPERS ────────────────────────────────────────────────────────────────
+const getActionIcon = (action: string) => {
+  switch (action) {
+    case 'login': return { icon: LogIn, color: '#3B82F6', bg: '#EFF6FF' };
+    case 'logout': return { icon: LogOut, color: '#EF4444', bg: '#FEF2F2' };
+    case 'create_invoice': return { icon: ReceiptText, color: '#8B5CF6', bg: '#F5F3FF' };
+    case 'create_user': return { icon: UserPlus, color: '#10B981', bg: '#ECFDF5' };
+    default: return { icon: History, color: '#64748B', bg: '#F1F5F9' };
+  }
+};
+
+const formatDate = (dateStr: string) => {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
 };
 
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
@@ -79,13 +78,10 @@ export default function FirmAdminDashboard() {
         setLoading(true);
         const response = await customFetch(API.DASHBOARD.GET);
         const json = await response.json();
-        if (!response.ok) {
-          throw new Error(json.detail || json.message || 'Failed to load dashboard');
-        }
+        if (!response.ok) throw new Error(json.detail || 'Failed to load');
         setData(json);
       } catch (err: any) {
-        setError(err.message || 'Failed to load dashboard');
-        console.error('Dashboard fetch error:', err);
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -93,333 +89,236 @@ export default function FirmAdminDashboard() {
     fetchDashboard();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F6F4F1] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin" style={{ color: BRAND }} />
-          <p className="text-sm text-gray-400 font-medium">Loading dashboard…</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+    </div>
+  );
 
-  if (error || !data) {
-    return (
-      <div className="min-h-screen bg-[#F6F4F1] flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-12 text-center max-w-md">
-          <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-          <p className="text-sm text-red-500 font-medium">{error || 'Failed to load dashboard'}</p>
-        </div>
-      </div>
-    );
-  }
+  if (error || !data) return (
+    <div className="min-h-screen flex items-center justify-center p-6 text-red-500">
+      <AlertCircle className="mr-2" /> {error || 'Data unavailable'}
+    </div>
+  );
 
-  const { cards, firm_info, user_name } = data;
-  
-  // Ensure cases object has all required properties with defaults
-  const rawCases = cards?.total_cases;
-  const cases = {
-    total: typeof rawCases === 'object' ? (rawCases.total || 0) : (rawCases || 0),
-    running: typeof rawCases === 'object' ? (rawCases.running || 0) : 0,
-    disposed: typeof rawCases === 'object' ? (rawCases.disposed || 0) : 0,
-    closed: typeof rawCases === 'object' ? (rawCases.closed || 0) : 0,
-  };
+  const { cards, firm_info, branch_info, user_name, recent_activity, user_id, role_display } = data;
 
-  // Ensure all required fields exist with defaults
-  const safeCards = {
-    total_clients: cards?.total_clients || 0,
-    total_documents: cards?.total_documents || 0,
-    team_members: cards?.team_members || 0,
-    todos: {
-      pending: cards?.todos?.pending || 0,
-      upcoming: cards?.todos?.upcoming || 0,
-    },
-  };
-
-  const safeFirmInfo = {
-    name: firm_info?.name || 'Unknown Firm',
-    code: firm_info?.code || 'N/A',
-    subscription: firm_info?.subscription || 'free',
-    practice_areas: firm_info?.practice_areas || [],
-  };
-
-  // Chart data
   const caseStatusData = [
-    { name: 'Running',  value: cases.running,  color: BLUE  },
-    { name: 'Disposed', value: cases.disposed, color: GREEN },
-    { name: 'Closed',   value: cases.closed,   color: SLATE },
-  ].filter(d => d.value > 0);
-
-  const hasChartData = caseStatusData.length > 0;
-  const totalCasesPie = caseStatusData.reduce((a, b) => a + b.value, 0);
-
-  const kpiBarData = [
-    { name: 'Cases',     value: cases.total,           color: BRAND_L },
-    { name: 'Clients',   value: safeCards.total_clients,   color: GREEN   },
-    { name: 'Documents', value: safeCards.total_documents, color: BLUE    },
-    { name: 'Team',      value: safeCards.team_members,    color: PURPLE  },
-  ];
-
-  const quickActions = [
-    { label: 'Create New Case',    href: '/firm-admin/cases/new'      },
-    { label: 'View All Cases',     href: '/firm-admin/cases'          },
-    { label: 'Manage Team',        href: '/firm-admin/users'          },
-    { label: 'View Documents',     href: '/firm-admin/documents'      },
-    { label: 'My Firm Branches',   href: '/firm-admin/my-firms'       },
+    { name: 'Running', value: cards.total_cases.running, color: '#3B82F6' },
+    { name: 'Disposed', value: cards.total_cases.disposed, color: '#22C55E' },
+    { name: 'Closed', value: cards.total_cases.closed, color: '#94A3B8' },
   ];
 
   return (
-    <div className="min-h-screen bg-[#F6F4F1] p-6 font-sans">
-      <div className="max-w-[1400px] mx-auto space-y-5">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 font-sans text-slate-800">
+      <div className="max-w-[1600px] mx-auto space-y-5">
 
-        {/* ── HEADER ── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4 flex items-center justify-between">
+        {/* ── TOP HEADER ── */}
+        <header className="flex justify-between items-center bg-white rounded-2xl border border-slate-100 shadow-sm px-6 py-4">
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dashboard Overview</p>
+            <h1 className="text-xl font-black text-slate-900 mt-0.5">Welcome, {user_name}</h1>
+          </div>
           <div className="flex items-center gap-4">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm tracking-wider"
-              style={{ background: `linear-gradient(135deg, ${BRAND_L}, ${BRAND})` }}
-            >
-              {safeFirmInfo.name.substring(0, 2).toUpperCase()}
+            <div className="text-right hidden md:block">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Current Session</p>
+              <p className="text-sm font-bold text-slate-700">{role_display}</p>
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">{safeFirmInfo.name}</h1>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Code: {safeFirmInfo.code} &nbsp;·&nbsp;
-                <span className="capitalize">{safeFirmInfo.subscription}</span> Plan
-                {safeFirmInfo.practice_areas && safeFirmInfo.practice_areas.length > 0 && (
-                  <> &nbsp;·&nbsp; {safeFirmInfo.practice_areas.join(', ')}</>
-                )}
-              </p>
+            <div className="flex items-center gap-3 pl-4 border-l border-slate-100">
+
+
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right mr-2 hidden md:block">
-              <p className="text-xs text-gray-400">Welcome back,</p>
-              <p className="text-sm font-bold text-gray-700">{user_name || 'Admin'}</p>
+        </header>
+
+        <div className="grid lg:grid-cols-12 gap-5">
+
+          {/* ── LEFT COLUMN (Main Content) ── */}
+          <div className="lg:col-span-9 space-y-5">
+
+            {/* Firm & Branch Info Card */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex flex-col md:flex-row items-center gap-6">
+              <div className="w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center text-white text-xl font-bold shrink-0">
+                {firm_info.name.substring(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 text-center md:text-left">
+                <h2 className="text-lg font-bold text-slate-900">{firm_info.name}</h2>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">Firm Code: {firm_info.code}</p>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 md:border-l md:pl-8 border-slate-100">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Branch</p>
+                  <p className="text-xs font-bold text-slate-800">{branch_info.name}</p>
+                  <p className="text-[10px] text-slate-500 font-medium">{branch_info.city}, {branch_info.state}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Contact</p>
+                  <p className="text-xs font-bold text-slate-800">{branch_info.phone_number}</p>
+                  <p className="text-[10px] text-slate-500 font-medium">{branch_info.email}</p>
+                </div>
+                <div className="col-span-2 md:col-span-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Status</p>
+                  <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-bold uppercase tracking-wide border border-blue-100">
+                    {firm_info.subscription}
+                  </span>
+                </div>
+              </div>
             </div>
-            <Link
-              href="/firm-admin/settings"
-              className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
-            >
-              Edit Profile
-            </Link>
-          </div>
-        </div>
 
-        {/* ── TOP STATS ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-
-          {/* Hero Cases Card */}
-          <div
-            className="col-span-2 relative rounded-2xl p-6 text-white overflow-hidden shadow-lg"
-            style={{ background: `linear-gradient(135deg, ${BRAND_L} 0%, ${BRAND} 55%, #1a2f47 100%)` }}
-          >
-            <div className="absolute top-0 right-0 w-56 h-56 rounded-full opacity-10 blur-3xl -mr-14 -mt-14" style={{ background: '#fff' }} />
-            <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full opacity-10 -ml-10 -mb-10" style={{ background: '#000' }} />
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <p className="text-[10px] font-bold tracking-[2px] uppercase text-white/70">Total Cases Portfolio</p>
-              </div>
-              <div className="flex items-end gap-3 mb-1">
-                <p className="text-5xl font-extrabold tracking-tight">{cases.total}</p>
-              </div>
-              <div className="grid grid-cols-3 gap-3 mt-4">
-                {[
-                  { label: 'Running',  count: cases.running,  dot: '#60A5FA' },
-                  { label: 'Disposed', count: cases.disposed, dot: '#34D399' },
-                  { label: 'Closed',   count: cases.closed,   dot: '#9CA3AF' },
-                ].map(s => (
-                  <div key={s.label} className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.dot }} />
-                      <span className="text-[9px] font-bold text-white/60 uppercase tracking-wider">{s.label}</span>
+            {/* Stats Grid */}
+            <div className="grid md:grid-cols-3 gap-4">
+              {/* Total Cases Big Card */}
+              <div className="md:col-span-1 rounded-2xl p-6 text-white relative overflow-hidden shadow-lg shadow-blue-500/10" style={{ background: BLUE_GRADIENT }}>
+                <div className="relative z-10 flex flex-col h-full justify-between">
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <p className="text-xs font-bold opacity-80 uppercase tracking-widest">Total Cases</p>
+                      <Briefcase size={18} className="opacity-40" />
                     </div>
-                    <span className="text-2xl font-extrabold leading-none">{s.count}</span>
+                    <p className="text-5xl font-black mt-2 tracking-tighter">{cards.total_cases.total}</p>
+                  </div>
+                  <div className="mt-8 grid grid-cols-3 gap-2">
+                    {caseStatusData.map(s => (
+                      <div key={s.name} className="bg-white/10 backdrop-blur-md rounded-xl p-2 border border-white/5">
+                        <p className="text-[8px] font-bold opacity-60 uppercase mb-0.5">{s.name}</p>
+                        <p className="text-xs font-bold">{s.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Smaller Cards Grid */}
+              <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
+                {[
+                  { label: 'Total Clients', val: cards.total_clients, icon: Users, color: ICON_COLORS.clients, bg: '#F0FDF4' },
+                  { label: 'Cloud Vault', val: cards.total_documents, icon: FileText, color: ICON_COLORS.documents, bg: '#F5F3FF' },
+                  { label: 'Team Members', val: cards.team_members, icon: UserCheck, color: ICON_COLORS.team, bg: '#FFF7ED' },
+                  { label: 'Pending Tasks', val: cards.todos.pending, icon: Clock, color: ICON_COLORS.pending, bg: '#FEFCE8' },
+                  { label: 'Upcoming', val: cards.todos.upcoming, icon: Calendar, color: ICON_COLORS.upcoming, bg: '#EFF6FF' },
+                ].map((s, idx) => (
+                  <div key={idx} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between hover:border-blue-200 transition-all">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mb-3" style={{ background: s.bg }}>
+                      <s.icon size={18} style={{ color: s.color }} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">{s.label}</p>
+                      <p className="text-xl font-black text-slate-900">{s.val}</p>
+                    </div>
                   </div>
                 ))}
+                <Link href="/firm-admin/cases/new" className="group">
+                  <div className="bg-slate-900 h-full p-4 rounded-2xl border border-slate-800 shadow-sm flex flex-col justify-center items-center text-center hover:bg-slate-800 transition-all">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                      <ArrowRight size={16} className="text-white" />
+                    </div>
+                    <p className="text-[10px] font-bold text-white uppercase tracking-widest">New Case</p>
+                  </div>
+                </Link>
               </div>
             </div>
-          </div>
 
-          {/* Stat cards */}
-          {[
-            { label: 'Total Clients',   val: safeCards.total_clients,   icon: Users,    bg: '#F0FDF4', iconBg: GREEN },
-            { label: 'Total Documents', val: safeCards.total_documents,  icon: FileText, bg: '#EFF6FF', iconBg: BLUE  },
-          ].map((s, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:border-gray-200 transition-colors">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-4" style={{ background: s.bg }}>
-                <s.icon size={16} style={{ color: s.iconBg }} />
-              </div>
-              <p className="text-2xl font-bold text-gray-900">{s.val.toLocaleString()}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* ── KPI STRIP ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { val: safeCards.team_members,    lbl: 'Team Members',    icon: UserCheck, bg: '#F5F3FF', iconBg: PURPLE               },
-            { val: safeCards.todos.pending,   lbl: 'Pending Todos',   icon: Clock,     bg: '#FFFBEB', iconBg: AMBER                },
-            { val: safeCards.todos.upcoming,  lbl: 'Upcoming Todos',  icon: Calendar,  bg: '#EFF6FF', iconBg: BLUE                 },
-            { val: safeFirmInfo.subscription,lbl: 'Subscription Plan',icon: Building2, bg: '#EFF3F8', iconBg: BRAND, isText: true  },
-          ].map((k, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: k.bg }}>
-                <k.icon size={18} style={{ color: k.iconBg }} />
-              </div>
-              <div>
-                <p className={`text-xl font-bold text-gray-900 ${(k as any).isText ? 'capitalize' : ''}`}>
-                  {typeof k.val === 'number' ? k.val.toLocaleString() : k.val}
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">{k.lbl}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── CHARTS ROW ── */}
-        <div className="grid lg:grid-cols-3 gap-4">
-
-          {/* KPI Bar Chart */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 [&_.recharts-surface]:outline-none">
-            <div className="mb-4">
-              <h2 className="text-sm font-bold text-gray-900">Overview</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Key metrics at a glance</p>
-            </div>
-            <div className="flex gap-4 mb-3">
-              {kpiBarData.map(d => (
-                <div key={d.name} className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: d.color }} />{d.name}
+            {/* Analytics & Distribution */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-slate-900 text-sm uppercase tracking-widest">Matter Statistics</h3>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Live Sync</span>
                 </div>
-              ))}
-            </div>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={kpiBarData} barCategoryGap="35%">
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#94A3B8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#94A3B8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" name="Count" radius={[6, 6, 0, 0]}>
-                  {kpiBarData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Case Status Donut */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 [&_.recharts-surface]:outline-none">
-            <div className="mb-4">
-              <h2 className="text-sm font-bold text-gray-900">Case Statistics</h2>
-              <p className="text-xs text-gray-400 mt-0.5">By status breakdown</p>
-            </div>
-            {hasChartData ? (
-              <>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={caseStatusData} cx="50%" cy="50%" innerRadius={55} outerRadius={80}
-                      paddingAngle={3} dataKey="value" stroke="none">
-                      {caseStatusData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: any) => [`${v} cases`, '']} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-2 mt-2">
+              </div>
+              <div className="grid md:grid-cols-5 gap-8 items-center">
+                <div className="md:col-span-2 h-[180px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={caseStatusData} innerRadius={55} outerRadius={75} paddingAngle={5} dataKey="value" stroke="none">
+                        {caseStatusData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: 'bold' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {caseStatusData.map(d => (
-                    <div key={d.name} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 text-gray-500">
-                        <span className="w-2 h-2 rounded-sm" style={{ background: d.color }} />
-                        {d.name}
-                      </div>
+                    <div key={d.name} className="flex items-center justify-between p-3 rounded-xl border border-slate-50 bg-slate-50/50">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-800">{d.value}</span>
-                        <span className="text-gray-400">{totalCasesPie > 0 ? Math.round(d.value / totalCasesPie * 100) : 0}%</span>
+                        <span className="w-2 h-2 rounded-full" style={{ background: d.color }} />
+                        <span className="text-xs font-bold text-slate-500">{d.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-black text-slate-800">{d.value}</span>
+                        <span className="text-[10px] font-bold text-slate-300 italic">{cards.total_cases.total > 0 ? Math.round((d.value / cards.total_cases.total) * 100) : 0}%</span>
                       </div>
                     </div>
                   ))}
                 </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-[260px] text-gray-300">
-                <Briefcase className="w-10 h-10 mb-2" />
-                <p className="text-sm font-medium">No case data yet</p>
-                <p className="text-xs mt-1">Cases will appear here once added</p>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── BOTTOM ROW ── */}
-        <div className="grid lg:grid-cols-3 gap-4">
-
-          {/* Firm Info */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-gray-900">Firm Information</h2>
-            </div>
-            <div className="p-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
-                {[
-                  { label: 'Firm Name',       value: safeFirmInfo.name                    },
-                  { label: 'Firm Code',       value: safeFirmInfo.code                    },
-                  { label: 'Subscription',    value: safeFirmInfo.subscription, capitalize: true },
-                  { label: 'Total Cases',     value: cases.total.toString()            },
-                  { label: 'Running Cases',   value: cases.running.toString()          },
-                  { label: 'Disposed Cases',  value: cases.disposed.toString()         },
-                  { label: 'Closed Cases',    value: cases.closed.toString()           },
-                  { label: 'Total Clients',   value: safeCards.total_clients.toString()    },
-                  { label: 'Total Documents', value: safeCards.total_documents.toString()  },
-                  { label: 'Team Members',    value: safeCards.team_members.toString()     },
-                  { label: 'Pending Todos',   value: safeCards.todos.pending.toString()    },
-                  { label: 'Upcoming Todos',  value: safeCards.todos.upcoming.toString()   },
-                ].map((item, i) => (
-                  <div key={i} className="flex justify-between py-2 border-b border-gray-50">
-                    <span className="text-sm font-semibold text-gray-400">{item.label}</span>
-                    <span className={`text-sm text-gray-800 ${item.capitalize ? 'capitalize' : ''}`}>{item.value}</span>
-                  </div>
-                ))}
-              </div>
-              {safeFirmInfo.practice_areas && safeFirmInfo.practice_areas.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-gray-100">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Practice Areas</p>
-                  <div className="flex flex-wrap gap-2">
-                    {safeFirmInfo.practice_areas.map((area, i) => (
-                      <span key={i} className="text-xs font-semibold px-3 py-1.5 rounded-lg border"
-                        style={{ background: `${BRAND}12`, color: BRAND, borderColor: `${BRAND}20` }}>
-                        {area}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-50">
-              <h2 className="text-sm font-bold text-gray-900">Quick Actions</h2>
-            </div>
-            <div className="p-4 space-y-2">
-              {quickActions.map(action => (
-                <Link key={action.label} href={action.href}
-                  className="flex items-center justify-between w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-[#FAFAF9] text-gray-700 hover:bg-gray-100 border border-gray-100 transition-colors">
-                  {action.label} <ArrowRight size={14} className="opacity-40" />
-                </Link>
-              ))}
-              <div className="pt-3 mt-2 border-t border-gray-100">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2.5">Dashboard Status</p>
-                <div className="flex items-center gap-1.5 mt-2">
-                  <CheckCircle2 size={12} className="text-emerald-500" />
-                  <span className="text-[11px] text-gray-400">Live data · All systems operational</span>
-                </div>
+          {/* ── RIGHT COLUMN (Activity) ── */}
+          <div className="lg:col-span-3">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm h-full flex flex-col">
+              <div className="p-5 border-b border-slate-50 flex justify-between items-center">
+                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-widest">Recent Activity</h3>
+                <Link href="#" className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100">View All</Link>
+              </div>
+              <div className="flex-1 overflow-y-auto p-5 space-y-6 relative max-h-[500px] lg:max-h-none">
+                <div className="absolute left-8 top-8 bottom-8 w-px bg-slate-50" />
+                {recent_activity.map((act, i) => {
+                  const style = getActionIcon(act.action);
+                  return (
+                    <div key={i} className="flex gap-4 relative z-10">
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-white" style={{ background: style.bg }}>
+                        <style.icon size={14} style={{ color: style.color }} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] font-bold text-slate-800 leading-tight">{act.description}</p>
+                        <p className="text-[9px] font-medium text-slate-400 italic truncate max-w-[140px]">{act.user__email}</p>
+                        <p className="text-[9px] font-black text-slate-300 uppercase mt-1 flex items-center gap-1">
+                          <Clock size={8} /> {formatDate(act.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="p-5 border-t border-slate-50">
+                <button className="w-full py-2.5 bg-slate-50 text-slate-600 text-[10px] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-slate-100 transition-all uppercase tracking-widest">
+                  System Audit Log <ArrowRight size={12} />
+                </button>
               </div>
             </div>
           </div>
         </div>
 
+        {/* ── FOOTER AT A GLANCE ── */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center justify-between gap-6">
+          <div className="flex items-center gap-10">
+            {[
+              { label: 'User ID', val: user_id.substring(0, 8), icon: ShieldCheck },
+              { label: 'Firm Code', val: firm_info.code, icon: Building2 },
+              { label: 'Branch Code', val: branch_info.code, icon: Briefcase },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <item.icon size={14} className="text-slate-300" />
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{item.label}</p>
+                  <p className="text-[10px] font-black text-slate-700 leading-none">{item.val}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Status:</span>
+            <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-bold uppercase border border-emerald-100">
+              <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+              Connected
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
