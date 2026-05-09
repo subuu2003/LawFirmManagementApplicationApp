@@ -1804,7 +1804,12 @@ class FirmJoinLinkViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Handle solo advocates (no firm)
-        firm_name = link.firm.firm_name if link.firm else "Solo Advocate"
+        if link.firm:
+            firm_name = link.firm.firm_name
+        else:
+            # For solo advocates, show the advocate's name instead of "Solo Advocate"
+            advocate_name = link.created_by.get_full_name() if link.created_by else "Independent Advocate"
+            firm_name = f"{advocate_name}'s Practice"
         
         return Response({
             'firm_name': firm_name,
