@@ -32,7 +32,23 @@ class TimeEntryViewSet(viewsets.ModelViewSet):
         if user.user_type == 'platform_owner':
             return TimeEntry.objects.all()
         elif user.user_type in ['super_admin', 'admin']:
-            return TimeEntry.objects.filter(firm=user.firm)
+            queryset = TimeEntry.objects.filter(firm=user.firm)
+            
+            # If admin is assigned to a specific branch, filter by that branch
+            if user.user_type == 'admin':
+                from accounts.models import UserFirmRole
+                membership = UserFirmRole.objects.filter(
+                    user=user,
+                    firm=user.firm,
+                    is_active=True,
+                    branch__isnull=False
+                ).first()
+                
+                if membership and membership.branch:
+                    # Admin is assigned to a branch, show only that branch's time entries
+                    queryset = queryset.filter(case__branch=membership.branch)
+                    
+            return queryset
         elif user.user_type in ['advocate', 'paralegal']:
             # See their own entries and entries for their cases
             return TimeEntry.objects.filter(
@@ -97,7 +113,23 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         if user.user_type == 'platform_owner':
             return Expense.objects.all()
         elif user.user_type in ['super_admin', 'admin']:
-            return Expense.objects.filter(firm=user.firm)
+            queryset = Expense.objects.filter(firm=user.firm)
+            
+            # If admin is assigned to a specific branch, filter by that branch
+            if user.user_type == 'admin':
+                from accounts.models import UserFirmRole
+                membership = UserFirmRole.objects.filter(
+                    user=user,
+                    firm=user.firm,
+                    is_active=True,
+                    branch__isnull=False
+                ).first()
+                
+                if membership and membership.branch:
+                    # Admin is assigned to a branch, show only that branch's expenses
+                    queryset = queryset.filter(case__branch=membership.branch)
+                    
+            return queryset
         elif user.user_type in ['advocate', 'paralegal']:
             return Expense.objects.filter(
                 Q(firm=user.firm) & (
@@ -149,6 +181,21 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             queryset = Invoice.objects.all()
         elif user.user_type in ['super_admin', 'admin']:
             queryset = Invoice.objects.filter(firm=user.firm)
+            
+            # If admin is assigned to a specific branch, filter by that branch
+            if user.user_type == 'admin':
+                from accounts.models import UserFirmRole
+                membership = UserFirmRole.objects.filter(
+                    user=user,
+                    firm=user.firm,
+                    is_active=True,
+                    branch__isnull=False
+                ).first()
+                
+                if membership and membership.branch:
+                    # Admin is assigned to a branch, show only that branch's invoices
+                    queryset = queryset.filter(branch=membership.branch)
+                    
         elif user.user_type in ['advocate', 'paralegal']:
             queryset = Invoice.objects.filter(
                 Q(firm=user.firm) & (
@@ -202,6 +249,25 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         if not firm and user.user_type != 'platform_owner':
             from rest_framework.exceptions import ValidationError
             raise ValidationError({'detail': 'User is not associated with a firm.'})
+
+        # Check if admin is assigned to a branch and validate case belongs to that branch
+        if user.user_type == 'admin':
+            from accounts.models import UserFirmRole
+            membership = UserFirmRole.objects.filter(
+                user=user,
+                firm=firm,
+                is_active=True,
+                branch__isnull=False
+            ).first()
+            
+            if membership and membership.branch:
+                # Admin is assigned to a branch
+                case = serializer.validated_data.get('case')
+                if case and case.branch != membership.branch:
+                    from rest_framework.exceptions import ValidationError
+                    raise ValidationError({
+                        'case': f'You can only create invoices for cases in your branch ({membership.branch.branch_name}).'
+                    })
 
         # Use provided invoice_number or auto-generate
         invoice_number = self.request.data.get('invoice_number', '').strip()

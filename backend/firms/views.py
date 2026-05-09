@@ -606,6 +606,19 @@ class BranchViewSet(viewsets.ModelViewSet):
         firm_ids = user.firm_memberships.values_list('firm_id', flat=True)
         return Branch.objects.filter(firm_id__in=firm_ids)
     
+    def create(self, request, *args, **kwargs):
+        """Override create to return branch with admin details"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        # Refresh the instance to get admin_details
+        instance = Branch.objects.get(pk=serializer.instance.pk)
+        output_serializer = self.get_serializer(instance)
+        
+        headers = self.get_success_headers(output_serializer.data)
+        return Response(output_serializer.data, status=201, headers=headers)
+    
     def perform_create(self, serializer):
         user = self.request.user
         if user.user_type not in ['platform_owner', 'super_admin', 'admin']:
@@ -634,7 +647,46 @@ class BranchViewSet(viewsets.ModelViewSet):
                 'upgrade_message': 'Please upgrade your subscription to create more branches.'
             })
         
-        serializer.save()
+        # Save the branch
+        branch = serializer.save()
+        
+        # Handle admin assignment if provided
+        admin_id = self.request.data.get('admin_id')
+        if admin_id:
+            from accounts.models import CustomUser, UserFirmRole
+            
+            try:
+                admin_user = CustomUser.objects.get(id=admin_id)
+                
+                # Validate admin user
+                if admin_user.user_type != 'admin':
+                    # Log warning but don't fail the branch creation
+                    pass
+                elif admin_user.firm != firm:
+                    # Log warning but don't fail the branch creation
+                    pass
+                else:
+                    # Assign admin to branch
+                    membership, created = UserFirmRole.objects.get_or_create(
+                        user=admin_user,
+                        firm=firm,
+                        defaults={'user_type': 'admin', 'branch': branch}
+                    )
+                    
+                    if not created:
+                        membership.branch = branch
+                        membership.user_type = 'admin'
+                        membership.save()
+                    
+                    from audit.models import AuditLog
+                    AuditLog.objects.create(
+                        user=user,
+                        action='assign_branch_admin',
+                        description=f'Assigned {admin_user.get_full_name()} as admin to branch: {branch.branch_name}'
+                    )
+            except CustomUser.DoesNotExist:
+                # Log warning but don't fail the branch creation
+                pass
     
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def assign_admin(self, request, pk=None):

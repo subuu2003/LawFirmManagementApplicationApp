@@ -366,19 +366,10 @@ class FirmSubscriptionViewSet(viewsets.ModelViewSet):
         
         # Calculate invoice amount based on plan price and duration
         monthly_price = Decimal(plan.price)
-        total_amount = monthly_price * duration_months
+        plan_amount = monthly_price * duration_months
         
-        # Apply discount for longer durations
-        discount_percentage = Decimal('0')
-        if duration_months == 3:
-            discount_percentage = Decimal('5')  # 5% off for 3 months
-        elif duration_months == 6:
-            discount_percentage = Decimal('10')  # 10% off for 6 months
-        elif duration_months == 12:
-            discount_percentage = Decimal('15')  # 15% off for 12 months
-        
-        discount_amount = (total_amount * discount_percentage) / Decimal('100')
-        final_amount = total_amount - discount_amount
+        # Note: Discounts can be applied manually by platform owner if needed
+        # The model will auto-calculate tax_amount and total_amount in save()
         
         # Generate invoice number
         invoice_count = PlatformInvoice.objects.count() + 1
@@ -391,17 +382,15 @@ class FirmSubscriptionViewSet(viewsets.ModelViewSet):
             invoice_number=invoice_number,
             invoice_date=timezone.now().date(),
             due_date=(timezone.now() + timedelta(days=30)).date(),
-            billing_period_start=timezone.now().date(),
-            billing_period_end=new_end_date.date(),
-            subtotal=total_amount,
-            discount_percentage=discount_percentage,
-            discount_amount=discount_amount,
-            total_amount=final_amount,
-            balance_due=final_amount,
+            period_start=timezone.now().date(),
+            period_end=new_end_date.date(),
+            plan_amount=plan_amount,
+            tax_percentage=Decimal('18'),  # 18% GST
             status='sent',  # Automatically mark as sent
             payment_method=payment_method,
-            payment_reference=payment_reference,
-            notes=f"Subscription upgrade to {plan.name} plan - {duration_months} month(s)"
+            transaction_id=payment_reference,
+            notes=f"Subscription upgrade to {plan.name} plan - {duration_months} month(s)",
+            created_by=user
         )
         
         # Log invoice creation
@@ -410,7 +399,7 @@ class FirmSubscriptionViewSet(viewsets.ModelViewSet):
             action='create_invoice',
             resource_type='platform_invoice',
             resource_id=str(platform_invoice.id),
-            description=f"Auto-generated invoice {invoice_number} for subscription upgrade - Amount: ₹{final_amount}"
+            description=f"Auto-generated invoice {invoice_number} for subscription upgrade - Amount: ₹{platform_invoice.total_amount}"
         )
 
         serializer = self.get_serializer(subscription)
@@ -421,7 +410,9 @@ class FirmSubscriptionViewSet(viewsets.ModelViewSet):
             'invoice': {
                 'id': str(platform_invoice.id),
                 'invoice_number': platform_invoice.invoice_number,
-                'total_amount': float(final_amount),
+                'plan_amount': float(platform_invoice.plan_amount),
+                'tax_amount': float(platform_invoice.tax_amount),
+                'total_amount': float(platform_invoice.total_amount),
                 'due_date': platform_invoice.due_date.isoformat(),
                 'status': platform_invoice.status
             }
@@ -573,19 +564,10 @@ class FirmSubscriptionViewSet(viewsets.ModelViewSet):
         
         # Calculate invoice amount based on plan price and duration
         monthly_price = Decimal(plan.price)
-        total_amount = monthly_price * duration_months
+        plan_amount = monthly_price * duration_months
         
-        # Apply discount for longer durations
-        discount_percentage = Decimal('0')
-        if duration_months == 3:
-            discount_percentage = Decimal('5')  # 5% off for 3 months
-        elif duration_months == 6:
-            discount_percentage = Decimal('10')  # 10% off for 6 months
-        elif duration_months == 12:
-            discount_percentage = Decimal('15')  # 15% off for 12 months
-        
-        discount_amount = (total_amount * discount_percentage) / Decimal('100')
-        final_amount = total_amount - discount_amount
+        # Note: Discounts can be applied manually by platform owner if needed
+        # The model will auto-calculate tax_amount and total_amount in save()
         
         # Generate invoice number
         invoice_count = PlatformInvoice.objects.count() + 1
@@ -598,15 +580,13 @@ class FirmSubscriptionViewSet(viewsets.ModelViewSet):
             invoice_number=invoice_number,
             invoice_date=timezone.now().date(),
             due_date=(timezone.now() + timedelta(days=30)).date(),
-            billing_period_start=timezone.now().date(),
-            billing_period_end=new_end_date.date(),
-            subtotal=total_amount,
-            discount_percentage=discount_percentage,
-            discount_amount=discount_amount,
-            total_amount=final_amount,
-            balance_due=final_amount,
+            period_start=timezone.now().date(),
+            period_end=new_end_date.date(),
+            plan_amount=plan_amount,
+            tax_percentage=Decimal('18'),  # 18% GST
             status='sent',  # Automatically mark as sent
-            notes=f"Subscription invoice for {plan.name} plan - {duration_months} month(s)"
+            notes=f"Subscription invoice for {plan.name} plan - {duration_months} month(s)",
+            created_by=request.user
         )
         
         # Log invoice creation
@@ -615,7 +595,7 @@ class FirmSubscriptionViewSet(viewsets.ModelViewSet):
             action='create_invoice',
             resource_type='platform_invoice',
             resource_id=str(platform_invoice.id),
-            description=f"Auto-generated invoice {invoice_number} for subscription activation - Amount: ₹{final_amount}"
+            description=f"Auto-generated invoice {invoice_number} for subscription activation - Amount: ₹{platform_invoice.total_amount}"
         )
 
         serializer = self.get_serializer(subscription)
@@ -626,7 +606,9 @@ class FirmSubscriptionViewSet(viewsets.ModelViewSet):
             'invoice': {
                 'id': str(platform_invoice.id),
                 'invoice_number': platform_invoice.invoice_number,
-                'total_amount': float(final_amount),
+                'plan_amount': float(platform_invoice.plan_amount),
+                'tax_amount': float(platform_invoice.tax_amount),
+                'total_amount': float(platform_invoice.total_amount),
                 'due_date': platform_invoice.due_date.isoformat(),
                 'status': platform_invoice.status
             }
