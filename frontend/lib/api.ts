@@ -38,7 +38,10 @@ export const API = {
     BRANCHES: {
       LIST: "/api/branches/",
       CREATE: "/api/branches/",
-      DETAIL: (uuid: string) => `/api/branches/${uuid}/`
+      DETAIL: (uuid: string) => `/api/branches/${uuid}/`,
+      ASSIGN_ADMIN: (uuid: string) => `/api/branches/${uuid}/assign_admin/`,
+      UNASSIGN_ADMIN: (uuid: string) => `/api/branches/${uuid}/unassign_admin/`,
+      ADMINS: (uuid: string) => `/api/branches/${uuid}/admins/`
     }
   },
   DOCUMENTS: {

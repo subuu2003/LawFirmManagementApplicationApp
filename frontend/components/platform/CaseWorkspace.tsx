@@ -110,7 +110,7 @@ const Field = ({ label, value, isBadge = false, badgeVariant = '' }: { label: st
   </div>
 );
 
-export function CaseWorkspace() {
+export function CaseWorkspace({ viewBase = '/advocate/cases' }: { viewBase?: string }) {
   const params = useParams();
   const router = useRouter();
   const caseId = params?.caseId as string;
@@ -177,7 +177,7 @@ export function CaseWorkspace() {
             <Upload className="w-4 h-4" /> Upload Document
           </button>
           <button
-            onClick={() => router.push(`/advocate/cases/${caseId}/edit`)}
+            onClick={() => router.push(`${viewBase}/${caseId}/edit`)}
             className="px-5 py-2 bg-[#311042] hover:bg-[#461a5e] text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
           >
             <Edit2 className="w-4 h-4" /> Edit Case

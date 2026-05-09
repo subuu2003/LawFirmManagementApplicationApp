@@ -2,17 +2,17 @@
 
 import CaseAddForm from '@/components/platform/CaseAddForm';
 
-export default function AdvocateCaseNewPage() {
+export default function FirmAdminCaseNewPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Create New Case</h1>
-          <p className="text-sm text-gray-500 mt-1">Register a new matter and assign it to your team</p>
+          <p className="text-sm text-gray-500 mt-1">Register a new matter and assign it to your branch team</p>
         </div>
       </div>
       
-      <CaseAddForm redirectBase="/advocate/cases" />
+      <CaseAddForm redirectBase="/firm-admin/cases" />
     </div>
   );
 }
