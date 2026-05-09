@@ -29,6 +29,21 @@ class CaseViewSet(viewsets.ModelViewSet):
             if user.firm:
                 # Firm-based: filter by firm
                 queryset = queryset.filter(firm=user.firm)
+                
+                # If admin is assigned to a specific branch, filter by that branch
+                if user.user_type == 'admin':
+                    from accounts.models import UserFirmRole
+                    membership = UserFirmRole.objects.filter(
+                        user=user,
+                        firm=user.firm,
+                        is_active=True,
+                        branch__isnull=False
+                    ).first()
+                    
+                    if membership and membership.branch:
+                        # Admin is assigned to a branch, show only that branch's cases
+                        queryset = queryset.filter(branch=membership.branch)
+                        
             elif user.user_type == 'advocate':
                 # Solo advocate: only their own cases
                 queryset = queryset.filter(solo_advocate=user)
