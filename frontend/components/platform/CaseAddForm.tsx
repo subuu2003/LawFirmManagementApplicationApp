@@ -213,7 +213,7 @@ export default function CaseAddForm({
                              currentUser?.available_firms?.find((m: any) => m.is_active)?.branch_id;
           
           if (userBranchId) {
-            const match = branchOptions.find(b => b.value === userBranchId);
+            const match = branchOptions.find((b: Option) => b.value === userBranchId);
             if (match) {
               setForm(p => ({ ...p, branch: match.value }));
             }
