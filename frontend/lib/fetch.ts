@@ -37,7 +37,37 @@ export const customFetch = async (endPoint: string, config: RequestInit = {}, he
     if (response.status === 404 && response.headers.get('content-type')?.includes('text/html')) {
       throw new Error("Not Found");
     }
-    // We intentionally let 401 fall through so that the invoking UI component can properly parse `data.message`!
+    
+    // Handle 403 Forbidden - could be subscription issue
+    if (response.status === 403) {
+      try {
+        const errorData = await response.clone().json();
+        
+        // Check if it's a subscription error
+        if (errorData.detail && 
+            (errorData.detail.includes('subscription') || 
+             errorData.detail.includes('expired') || 
+             errorData.detail.includes('suspended'))) {
+          
+          // Store subscription error for display
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('subscription_error', JSON.stringify({
+              message: errorData.detail,
+              timestamp: Date.now()
+            }));
+            
+            // Dispatch custom event for components to listen to
+            window.dispatchEvent(new CustomEvent('subscription-error', {
+              detail: { message: errorData.detail }
+            }));
+          }
+        }
+      } catch (e) {
+        // If JSON parsing fails, just continue
+      }
+    }
+    
+    // We intentionally let 401 and 403 fall through so that the invoking UI component can properly parse the response
 
     return response;
   } catch (error: any) {
