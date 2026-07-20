@@ -8,8 +8,13 @@ import string
 
 
 class UserFirmRoleSerializer(serializers.ModelSerializer):
-    firm_name = serializers.CharField(source='firm.firm_name', read_only=True)
+    firm_name = serializers.SerializerMethodField()
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
+    
+    def get_firm_name(self, obj):
+        if obj.firm:
+            return obj.firm.firm_name
+        return "Independent Practice (Solo)"
     
     class Meta:
         model = UserFirmRole
@@ -306,13 +311,15 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 user_account=user
             )
         
-        # Create UserFirmRole mapping if firm was created
-        if firm:
-            branch = None
-            if branch_id:
-                from firms.models import Branch
-                branch = Branch.objects.filter(id=branch_id, firm=firm).first()
-                
+        # Create UserFirmRole mapping (Membership)
+        branch = None
+        if firm and branch_id:
+            from firms.models import Branch
+            branch = Branch.objects.filter(id=branch_id, firm=firm).first()
+        
+        # Only create a membership for the registered context (Firm or Solo)
+        # If 'firm' is None, this is a solo membership, which is ONLY for Advocates/Clients.
+        if firm or user_type in ['advocate', 'client']:
             UserFirmRole.objects.update_or_create(
                 user=user,
                 firm=firm,

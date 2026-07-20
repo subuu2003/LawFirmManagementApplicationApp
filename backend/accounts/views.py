@@ -879,28 +879,62 @@ class CustomUserViewSet(viewsets.ModelViewSet):
         Switch the authenticated user's active firm context.
         
         POST /api/users/switch_firm/
-        Body: { "firm_id": "<uuid>", "branch_id": "<uuid>" (optional) }
+        Body: { "firm_id": "<uuid>" or null or "solo", "branch_id": "<uuid>" (optional) }
         
-        - Works even if the membership was previously set to is_active=False
-          (re-activates it so the user can resume working in that firm).
-        - An advocate/client can belong to multiple firms; this call updates
-          the 'last active' pointer and syncs CustomUser.firm for backward compat.
+        - Supports switching to a formal law firm or to "Independent Practice" (Solo).
+        - Updates the 'last active' pointer and syncs CustomUser.firm.
         """
         firm_id = request.data.get('firm_id')
         branch_id = request.data.get('branch_id')
         
-        if not firm_id:
-            return Response({'error': 'firm_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        # Handle "solo" or null firm_id
+        is_switching_to_solo = (firm_id is None or firm_id == 'solo' or firm_id == '')
         
-        try:
-            # Fetch membership regardless of is_active status so the user can
-            # re-activate a previously deactivated membership by switching to it.
-            membership = UserFirmRole.objects.get(user=request.user, firm_id=firm_id)
-        except UserFirmRole.DoesNotExist:
-            return Response(
-                {'error': 'You are not a member of this firm. Ask the firm admin to add you first.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        if is_switching_to_solo:
+            # Check if user is allowed to have a solo context
+            # We check all memberships to see if they have EVER been an advocate or client,
+            # or if they are currently one.
+            allowed_types = ['advocate', 'client']
+            is_eligible = UserFirmRole.objects.filter(
+                user=request.user, 
+                user_type__in=allowed_types
+            ).exists()
+            
+            if not is_eligible and request.user.user_type not in allowed_types:
+                return Response(
+                    {'error': 'Only individual advocates and clients can have an independent work environment.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Check if solo role already exists
+            # We try to find the existing solo role to determine the correct user_type for the solo context
+            membership = UserFirmRole.objects.filter(user=request.user, firm=None).first()
+            
+            if not membership:
+                # Determine user_type for new solo role. 
+                # If they are an advocate in ANY firm, they are a solo advocate.
+                # Else they are a client.
+                has_advocate_role = UserFirmRole.objects.filter(user=request.user, user_type='advocate').exists()
+                solo_type = 'advocate' if has_advocate_role else 'client'
+                
+                membership = UserFirmRole.objects.create(
+                    user=request.user,
+                    firm=None,
+                    user_type=solo_type,
+                    is_last_active=True
+                )
+            
+            firm_name_display = "Independent Practice (Solo)"
+        else:
+            try:
+                # Fetch membership for the specific firm
+                membership = UserFirmRole.objects.get(user=request.user, firm_id=firm_id)
+                firm_name_display = membership.firm.firm_name
+            except UserFirmRole.DoesNotExist:
+                return Response(
+                    {'error': 'You are not a member of this firm. Ask the firm admin to add you first.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
         
         # Re-activate the membership if it was deactivated
         if not membership.is_active:
@@ -912,9 +946,10 @@ class CustomUserViewSet(viewsets.ModelViewSet):
         # Mark this one as last active
         membership.is_last_active = True
         
-        # Update branch if provided
-        if branch_id:
+        # Update branch if provided (only for firm context)
+        if branch_id and not is_switching_to_solo:
             try:
+                from firms.models import Branch
                 branch = Branch.objects.get(id=branch_id, firm_id=firm_id)
                 membership.branch = branch
             except Branch.DoesNotExist:
@@ -923,20 +958,21 @@ class CustomUserViewSet(viewsets.ModelViewSet):
         membership.save()
         
         # Sync to CustomUser for backward compatibility
-        request.user.firm = membership.firm
+        request.user.firm = membership.firm # Will be None if solo
         request.user.user_type = membership.user_type
         request.user.save()
         
-        branch_info = f" (Branch: {membership.branch.branch_name})" if membership.branch else ""
-        log_audit(request.user, 'switch_firm', f'Switched active firm to {membership.firm.firm_name}{branch_info}')
+        branch_info = f" (Branch: {membership.branch.branch_name})" if (not is_switching_to_solo and membership.branch) else ""
+        log_audit(request.user, 'switch_firm', f'Switched active firm to {firm_name_display}{branch_info}')
         
-        # Return enriched membership list so the frontend can update the firm switcher
+        # Return enriched membership list
         all_memberships = UserFirmRoleSerializer(request.user.firm_memberships.all(), many=True).data
         
         return Response({
-            'message': f'Switched to {membership.firm.firm_name}{branch_info}',
+            'message': f'Switched to {firm_name_display}{branch_info}',
             'user': CustomUserSerializer(request.user).data,
             'available_firms': all_memberships,
+            'active_firm_id': str(membership.firm.id) if membership.firm else None
         })
     
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated], url_name='change_password')
