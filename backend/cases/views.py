@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import viewsets, permissions, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -25,38 +26,50 @@ class CaseViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = Case.objects.all()
         
-        # ── Client users: short-circuit BEFORE firm/advocate filters ──
+        if user.user_type == 'platform_owner':
+            return queryset
+            
+        # Determine the active firm context (supports None for solo)
+        active_firm = user.firm
+        
+        # ── CLIENT FILTERING ──
         if user.user_type == 'client':
-            # A client user might have multiple client profiles (across different firms)
-            client_profiles = user.client_profiles.all()
+            # Filter specifically by the active firm context
+            client_profiles = user.client_profiles.filter(firm=active_firm)
             if client_profiles.exists():
                 return Case.objects.filter(client__in=client_profiles)
             return Case.objects.none()
         
-        if user.user_type != 'platform_owner':
-            if user.firm:
-                # Firm-based: filter by firm
-                queryset = queryset.filter(firm=user.firm)
+        # ── FIRM-BASED USERS (Admin, Super Admin, Advocate, Paralegal) ──
+        if active_firm:
+            queryset = queryset.filter(firm=active_firm)
+            
+            # Additional filtering for Advocates/Paralegals within a firm
+            if user.user_type in ['advocate', 'paralegal']:
+                queryset = queryset.filter(
+                    Q(assigned_advocate=user) | 
+                    Q(assigned_paralegal=user)
+                ).distinct()
+            
+            # Admin branch filtering
+            elif user.user_type == 'admin':
+                from accounts.models import UserFirmRole
+                membership = UserFirmRole.objects.filter(
+                    user=user,
+                    firm=active_firm,
+                    is_active=True,
+                    branch__isnull=False
+                ).first()
                 
-                # If admin is assigned to a specific branch, filter by that branch
-                if user.user_type == 'admin':
-                    from accounts.models import UserFirmRole
-                    membership = UserFirmRole.objects.filter(
-                        user=user,
-                        firm=user.firm,
-                        is_active=True,
-                        branch__isnull=False
-                    ).first()
-                    
-                    if membership and membership.branch:
-                        # Admin is assigned to a branch, show only that branch's cases
-                        queryset = queryset.filter(branch=membership.branch)
-                        
-            elif user.user_type == 'advocate':
-                # Solo advocate: only their own cases
-                queryset = queryset.filter(solo_advocate=user)
-            else:
-                queryset = queryset.none()
+                if membership and membership.branch:
+                    queryset = queryset.filter(branch=membership.branch)
+        
+        # ── SOLO ADVOCATE FILTERING ──
+        elif user.user_type == 'advocate':
+            # Only their own solo cases (where firm is None)
+            queryset = queryset.filter(firm=None, solo_advocate=user)
+        else:
+            queryset = queryset.none()
         
         # Filter by assigned advocate (for advocates to see only their cases)
         assigned_to_me = self.request.query_params.get('assigned_to_me')

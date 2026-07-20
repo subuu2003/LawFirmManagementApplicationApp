@@ -296,8 +296,19 @@ class UserFirmRole(models.Model):
             models.Index(fields=['is_active']),
         ]
     
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.firm is None and self.user_type not in ['advocate', 'client']:
+            raise ValidationError("Solo context (Independent Practice) is only available for individual advocates and clients.")
+        super().clean()
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+    
     def __str__(self):
-        return f"{self.user.email} - {self.firm.firm_name} ({self.get_user_type_display()})"
+        firm_name = self.firm.firm_name if self.firm else "Solo Practice"
+        return f"{self.user.email} - {firm_name} ({self.get_user_type_display()})"
 
 
 class AdvocateParalegalAssignment(models.Model):
