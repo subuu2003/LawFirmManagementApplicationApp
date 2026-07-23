@@ -8,6 +8,7 @@ import {
   Download, Share2, CheckCircle, Edit, ArrowLeft, RefreshCw
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { motion } from 'framer-motion';
 import SignaturePad from './SignaturePad';
 
 // A4 dimensions in pixels at 96 DPI
@@ -189,6 +190,13 @@ function DraftingArea({
         </div>
       )}
 
+      <style>{`
+        #editor_${fieldName} u {
+          text-underline-offset: 4px;
+          text-decoration-thickness: 1px;
+        }
+      `}</style>
+
       <div
         ref={editorRef}
         id={`editor_${fieldName}`}
@@ -237,6 +245,23 @@ export default function PDFCourtFormEditor({ caseId, clientId, role, accent = '#
 
   // Field values for the form
   const [fieldValues, setFieldValues] = useState<Record<string, any>>({});
+
+  const handleSignatureDragEnd = (sigType: string, info: any) => {
+    setFieldValues(prev => {
+      const currentOffsets = prev.signature_offsets || {};
+      const typeOffset = currentOffsets[sigType] || { x: 0, y: 0 };
+      return {
+        ...prev,
+        signature_offsets: {
+          ...currentOffsets,
+          [sigType]: {
+            x: typeOffset.x + info.offset.x,
+            y: typeOffset.y + info.offset.y
+          }
+        }
+      };
+    });
+  };
 
   const isAdvocateRole = role === 'advocate' || role === 'super-admin' || role === 'firm-admin';
   const isClientRole = role === 'client';
@@ -540,12 +565,22 @@ export default function PDFCourtFormEditor({ caseId, clientId, role, accent = '#
         const pCliSign = isPSign && (pLower.includes('client') || pLower.includes('deponent') || pLower.includes('party'));
 
         const pSigImg = pAdvSign ? selectedForm?.advocate_signature_image : pCliSign ? selectedForm?.client_signature_image : null;
+        const pSigType = pAdvSign ? 'advocate' : (pCliSign ? 'client' : 'other');
+        const pInitPos = fieldValues.signature_offsets?.[pSigType] || { x: 0, y: 0 };
 
         return (
           <div key={index} className="mb-4">
             {pSigImg && (
               <div className={style.align === 'center' ? 'flex justify-center' : style.align === 'right' ? 'flex justify-end' : 'flex justify-start'}>
-                <img src={formatSignatureUrl(pSigImg)} alt="Signature" className="h-14 object-contain mb-[-10px] relative z-10" />
+                <motion.img 
+                  drag={view === 'edit' || view === 'preview'}
+                  dragMomentum={false}
+                  initial={{ x: pInitPos.x, y: pInitPos.y }}
+                  onDragEnd={(e, info) => handleSignatureDragEnd(pSigType, info)}
+                  src={formatSignatureUrl(pSigImg)} 
+                  alt="Signature" 
+                  className={`h-14 object-contain mb-[-10px] relative z-20 ${(view === 'edit' || view === 'preview') ? 'cursor-grab active:cursor-grabbing hover:scale-105 transition-transform' : ''}`}
+                />
               </div>
             )}
             <p className={styleClasses} style={{
@@ -596,12 +631,22 @@ export default function PDFCourtFormEditor({ caseId, clientId, role, accent = '#
         const isAdvocateSig = sigLower.includes('advocate') || sigLower.includes('mediator') || sigLower.includes('counsel');
         const isClientSig = sigLower.includes('client') || sigLower.includes('applicant') || sigLower.includes('party') || sigLower.includes('deponent');
         const sigImg = isAdvocateSig ? selectedForm?.advocate_signature_image : isClientSig ? selectedForm?.client_signature_image : null;
+        const sType = isAdvocateSig ? 'advocate' : (isClientSig ? 'client' : 'other');
+        const sInitPos = fieldValues.signature_offsets?.[sType] || { x: 0, y: 0 };
 
         return (
           <div key={index} className={styleClasses + " my-4"}>
             <div className="flex flex-col items-center">
               {sigImg ? (
-                <img src={formatSignatureUrl(sigImg)} alt="Signature" className="h-16 object-contain mb-1" />
+                <motion.img 
+                  drag={view === 'edit' || view === 'preview'}
+                  dragMomentum={false}
+                  initial={{ x: sInitPos.x, y: sInitPos.y }}
+                  onDragEnd={(e, info) => handleSignatureDragEnd(sType, info)}
+                  src={formatSignatureUrl(sigImg)} 
+                  alt="Signature" 
+                  className={`h-16 object-contain mb-1 relative z-20 ${(view === 'edit' || view === 'preview') ? 'cursor-grab active:cursor-grabbing hover:scale-105 transition-transform' : ''}`}
+                />
               ) : (
                 <div className="h-16" /> // Spacer for unsigned
               )}
@@ -714,6 +759,8 @@ export default function PDFCourtFormEditor({ caseId, clientId, role, accent = '#
               const colAdvSign = isColSign && (colPrefixLower.includes('advocate') || colPrefixLower.includes('counsel'));
               const colCliSign = isColSign && (colPrefixLower.includes('client') || colPrefixLower.includes('party') || colPrefixLower.includes('deponent'));
               const colSigImg = colAdvSign ? selectedForm?.advocate_signature_image : colCliSign ? selectedForm?.client_signature_image : null;
+              const colSType = colAdvSign ? 'advocate' : (colCliSign ? 'client' : 'other');
+              const colSInitPos = fieldValues.signature_offsets?.[colSType] || { x: 0, y: 0 };
 
               return (
                 <div key={i} className="flex-1 min-w-[50px] flex flex-col pt-4" style={{
@@ -721,7 +768,15 @@ export default function PDFCourtFormEditor({ caseId, clientId, role, accent = '#
                   alignItems: col.align === 'center' ? 'center' : col.align === 'right' ? 'flex-end' : 'flex-start'
                 }}>
                   {colSigImg && (
-                    <img src={formatSignatureUrl(colSigImg)} alt="Signature" className="h-12 object-contain mb-[-8px] relative z-10" />
+                    <motion.img 
+                      drag={view === 'edit' || view === 'preview'}
+                      dragMomentum={false}
+                      initial={{ x: colSInitPos.x, y: colSInitPos.y }}
+                      onDragEnd={(e, info) => handleSignatureDragEnd(colSType, info)}
+                      src={formatSignatureUrl(colSigImg)} 
+                      alt="Signature" 
+                      className={`h-12 object-contain mb-[-8px] relative z-20 ${(view === 'edit' || view === 'preview') ? 'cursor-grab active:cursor-grabbing hover:scale-105 transition-transform' : ''}`}
+                    />
                   )}
                   <div className="w-full flex items-center">
                     {col.prefix && <span className="text-black font-medium mr-1 text-[11px] whitespace-nowrap">{col.prefix}</span>}

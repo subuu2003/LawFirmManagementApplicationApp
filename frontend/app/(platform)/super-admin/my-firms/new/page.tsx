@@ -211,6 +211,7 @@ function AdminPickerDropdown({
 // --- Main Page ---
 export default function AddNewFirmPage() {
   const router = useRouter();
+  const randomSuffix = useRef(Math.floor(1000 + Math.random() * 9000).toString());
   const [loading, setLoading] = useState(false);
   const [fetchingFirm, setFetchingFirm] = useState(true);
   const [fetchingAdmins, setFetchingAdmins] = useState(true);
@@ -318,8 +319,19 @@ export default function AddNewFirmPage() {
 
   const updateField = (field: string, value: string) => {
     let finalValue = value;
-    if (field === 'phone_number') finalValue = value.replace(/\D/g, '').slice(0, 10);
-    setFormData(prev => ({ ...prev, [field]: finalValue }));
+    const updates: any = { [field]: finalValue };
+
+    if (field === 'phone_number') {
+      finalValue = value.replace(/\D/g, '').slice(0, 10);
+      updates[field] = finalValue;
+    }
+
+    if (field === 'branch_name') {
+      const prefix = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+      updates.branch_code = prefix ? `${prefix}-${randomSuffix.current}` : '';
+    }
+
+    setFormData(prev => ({ ...prev, ...updates }));
   };
 
   if (fetchingFirm) {
@@ -393,7 +405,13 @@ export default function AddNewFirmPage() {
               </div>
               <div>
                 <label className={labelClass}>Branch Code</label>
-                <input type="text" value={formData.branch_code} onChange={e => updateField('branch_code', e.target.value)} placeholder="BR-001" className={inputClass} />
+                <input 
+                  type="text" 
+                  value={formData.branch_code} 
+                  readOnly
+                  placeholder="Auto-generated" 
+                  className={inputClass + ' bg-gray-50 cursor-not-allowed opacity-75'} 
+                />
               </div>
               <div>
                 <label className={labelClass}>City <span className="text-red-500">*</span></label>

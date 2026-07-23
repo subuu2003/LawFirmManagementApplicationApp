@@ -2948,24 +2948,23 @@ class Command(BaseCommand):
                                 },
                                 {
                                     'cells': [
-                                        {'text': 'Advocate Name', 'flex': 0.8},
+                                        {'text': 'Advocate Name:', 'flex': 0.5},
                                         {'label': 'SURNAME', 'field': 'adv_surname', 'flex': 1},
-                                        {'label': 'FIRST NAME', 'field': 'adv_firstname', 'flex': 1},
-                                        {'label': 'MIDDLE NAME', 'field': 'adv_middlename', 'flex': 1}
+                                        {'label': 'FIRST NAME', 'field': 'adv_firstname', 'flex': 1}
                                     ]
                                 },
                                 {
                                     'cells': [
-                                        {'text': 'Sex', 'flex': 0.8},
-                                        {'label': 'Male / Female', 'field': 'adv_sex', 'flex': 3}
+                                        {'label': 'MIDDLE NAME', 'field': 'adv_middlename', 'flex': 1},
+                                        {'label': 'Sex (Male / Female)', 'field': 'adv_sex', 'flex': 1}
                                     ]
                                 },
                                 {
                                     'cells': [
-                                        {'text': 'Date of Birth', 'flex': 0.8},
+                                        {'text': 'Date of Birth', 'flex': 2},
                                         {'label': 'DD', 'field': 'adv_dob_dd', 'flex': 1},
                                         {'label': 'MM', 'field': 'adv_dob_mm', 'flex': 1},
-                                        {'label': 'YYYY', 'field': 'adv_dob_yyyy', 'flex': 1}
+                                        {'label': 'YYYY', 'field': 'adv_dob_yyyy', 'flex': 2}
                                     ]
                                 },
                                 {

@@ -18,6 +18,7 @@ import { useTopbarTitle } from './TopbarContext';
 import DocumentManager from './DocumentManager';
 import DocumentVerificationSystem from './DocumentVerificationSystem';
 import PDFCourtFormEditor from './PDFCourtFormEditor';
+import { DocuMindIntegration } from './DocuMindIntegration';
 
 // --- Types ---
 interface CaseData {
@@ -552,16 +553,8 @@ export function CaseWorkspace({
         )}
 
         {activeTab === 'Drafting' && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <PDFCourtFormEditor
-              caseId={caseId}
-              clientId={caseData.client || caseData.client_id}
-              role={role}
-              accent={accent}
-              categoryFilter="drafting"
-              initialFormId={initialFormId}
-              newBlank={newBlank}
-            />
+          <div className="bg-white rounded-xl shadow-sm">
+            <DocuMindIntegration caseId={caseId} />
           </div>
         )}
 

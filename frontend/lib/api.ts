@@ -1,6 +1,6 @@
-// Use environment variable or default to production
-// To use local: set NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 in .env.local
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://antlegal.anthemgt.com";
+// Use environment variable or fall back to local development.
+// Production should set NEXT_PUBLIC_API_BASE_URL explicitly.
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 /**
  * Complete AntLegal API Reference Layer.
@@ -200,5 +200,4 @@ export const SUBSCRIPTION_PLANS = [
   { id: '81d8de45-4415-42f8-8864-8e2b7d9d7812', name: 'Business', price: '₹2,499', period: 'month' },
   { id: '4f468d40-a761-4e26-a7f5-a4f8e45c7534', name: 'Enterprise', price: 'Custom', period: '' },
 ] as const;
-
 
