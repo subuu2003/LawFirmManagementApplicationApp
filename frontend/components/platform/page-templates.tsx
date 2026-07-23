@@ -52,6 +52,7 @@ import {
   PANInput,
   PhoneInput,
 } from '@/components/platform/ui';
+import { DocuMindIntegration } from './DocuMindIntegration';
 import {
   activityRows,
   caseFormFields,
@@ -2453,7 +2454,7 @@ export function DocumentDetailPage({ accent, roleTitle, documentId }: AccentProp
   );
 }
 
-export function DraftsPage({ accent, roleTitle, approvalMode, viewBase }: AccentProps & { roleTitle: string; approvalMode?: boolean; viewBase?: string }) {
+export function DraftsPage({ accent, roleTitle, approvalMode, viewBase, forceCaseId, hideHeader }: AccentProps & { roleTitle: string; approvalMode?: boolean; viewBase?: string; forceCaseId?: string; hideHeader?: boolean }) {
   const [drafts, setDrafts] = useState<any[]>([]);
   const [allCases, setAllCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2482,7 +2483,9 @@ export function DraftsPage({ accent, roleTitle, approvalMode, viewBase }: Accent
       setAllCases(casesList);
 
       // Auto-select ONLY if nothing is selected yet
-      if (casesList.length > 0 && !selectedCaseId) {
+      if (forceCaseId) {
+        setSelectedCaseId(forceCaseId);
+      } else if (casesList.length > 0 && !selectedCaseId) {
         const caseWithDrafts = casesList.find((c: any) => draftsList.some((d: any) => d.case === c.id));
         setSelectedCaseId(String(caseWithDrafts ? caseWithDrafts.id : casesList[0].id));
       }
@@ -2722,11 +2725,13 @@ export function DraftsPage({ accent, roleTitle, approvalMode, viewBase }: Accent
 
   return (
     <div className="space-y-8">
-      <PageSection
-        eyebrow="Drafting"
-        title={`${roleTitle} Draft Workspace`}
-        description="Draft petitions and supporting legal documents for assigned matters. Documents are organized by Case for easy filing pack management."
-      />
+      {!hideHeader && (
+        <PageSection
+          eyebrow="Drafting"
+          title={`${roleTitle} Draft Workspace`}
+          description="Draft petitions and supporting legal documents for assigned matters. Documents are organized by Case for easy filing pack management."
+        />
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -2746,54 +2751,57 @@ export function DraftsPage({ accent, roleTitle, approvalMode, viewBase }: Accent
         </div>
       ) : (
         <div className="space-y-8">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-purple-900" />
-                Select Case Workspace
-              </h3>
-              <div className="relative group max-w-xs w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 group-focus-within:text-purple-600 transition-colors" />
-                <input
-                  type="text"
-                  placeholder="Search by Case No. or Title..."
-                  value={caseSearchQuery}
-                  onChange={(e) => setCaseSearchQuery(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg py-1.5 pl-9 pr-3 text-xs font-semibold outline-none focus:bg-white focus:border-purple-300 focus:ring-4 focus:ring-purple-500/5 transition-all placeholder:text-gray-400 text-gray-900"
+          {!forceCaseId && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-purple-900" />
+                  Select Case Workspace
+                </h3>
+                <div className="relative group max-w-xs w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 group-focus-within:text-purple-600 transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="Search by Case No. or Title..."
+                    value={caseSearchQuery}
+                    onChange={(e) => setCaseSearchQuery(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg py-1.5 pl-9 pr-3 text-xs font-semibold outline-none focus:bg-white focus:border-purple-300 focus:ring-4 focus:ring-purple-500/5 transition-all placeholder:text-gray-400 text-gray-900"
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-2 overflow-x-auto max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+                <SimpleTabs
+                  tabs={allCases
+                    .filter(c => {
+                      if (!caseSearchQuery) return true;
+                      const q = caseSearchQuery.toLowerCase();
+                      return (c.case_number || '').toLowerCase().includes(q) ||
+                        (c.case_title || '').toLowerCase().includes(q);
+                    })
+                    .map(c => ({
+                      label: c.case_number || c.case_title || 'Untitled',
+                      active: String(c.id) === selectedCaseId
+                    }))}
+                  onClick={(label) => {
+                    const c = allCases.find(cas => (cas.case_number || cas.case_title) === label);
+                    if (c) setSelectedCaseId(String(c.id));
+                  }}
                 />
               </div>
             </div>
-            <div className="px-6 py-2 overflow-x-auto max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
-              <SimpleTabs
-                tabs={allCases
-                  .filter(c => {
-                    if (!caseSearchQuery) return true;
-                    const q = caseSearchQuery.toLowerCase();
-                    return (c.case_number || '').toLowerCase().includes(q) ||
-                      (c.case_title || '').toLowerCase().includes(q);
-                  })
-                  .map(c => ({
-                    label: c.case_number || c.case_title || 'Untitled',
-                    active: String(c.id) === selectedCaseId
-                  }))}
-                onClick={(label) => {
-                  const c = allCases.find(cas => (cas.case_number || cas.case_title) === label);
-                  if (c) setSelectedCaseId(String(c.id));
-                }}
-              />
-            </div>
-          </div>
+          )}
 
           {allCases
             .filter((c) => String(c.id) === selectedCaseId)
             .map((currentCase) => {
               const caseEntries = groupedByCase[currentCase.case_number || 'Unknown Case'] || [];
               return (
-                <Panel
-                  key={currentCase.id}
-                  title={`Case Filing Pack: ${currentCase.case_number || currentCase.case_title}`}
-                  subtitle={`${caseEntries.length} documents arranged for filing`}
-                  className="relative"
+                <div key={currentCase.id} className="space-y-8">
+                  <DocuMindIntegration caseId={String(currentCase.id)} />
+                  <Panel
+                    title={`Case Filing Pack: ${currentCase.case_number || currentCase.case_title}`}
+                    subtitle={`${caseEntries.length} documents arranged for filing`}
+                    className="relative"
                   actions={
                     <div className="flex gap-2">
                       <div className="hidden lg:flex items-center mr-4 px-3 py-1.5 bg-purple-50 rounded-lg border border-purple-100 gap-2">
@@ -2926,6 +2934,7 @@ export function DraftsPage({ accent, roleTitle, approvalMode, viewBase }: Accent
                     </div>
                   )}
                 </Panel>
+                </div>
               );
             })}
         </div>

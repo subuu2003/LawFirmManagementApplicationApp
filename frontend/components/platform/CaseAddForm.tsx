@@ -44,9 +44,9 @@ const MANDATORY_FIELDS = {
 };
 
 const STEPS = [
+  { id: 'court', title: 'Court', description: 'Jurisdiction', icon: Building2 },
   { id: 'identity', title: 'Identity', description: 'Legal Classification', icon: Scale },
   { id: 'assignments', title: 'Personnel', description: 'Branch & Staff', icon: Users },
-  { id: 'court', title: 'Court', description: 'Jurisdiction', icon: Building2 },
   { id: 'economics', title: 'Finalize', description: 'Financials & Docs', icon: FileCheck },
 ];
 
@@ -245,29 +245,45 @@ export default function CaseAddForm({
 
   const nextStep = () => {
     setError(null);
-    if (currentStep === 0) {
+    setFieldErrors({});
+    let hasError = false;
+    const newErrors: Record<string, string[]> = {};
+    const missing: string[] = [];
+
+    if (currentStep === 1) {
       if (!form.case_title) {
-        setError("Case Title is required.");
-        return;
+        newErrors.case_title = ["Case Title is required."];
+        missing.push("Case Title");
+        hasError = true;
       }
       if (!form.case_type) {
-        setError("Case Type is required.");
-        return;
+        newErrors.case_type = ["Case Type is required."];
+        missing.push("Case Type");
+        hasError = true;
       }
-    } else if (currentStep === 1) {
+    } else if (currentStep === 2) {
       if (!form.client) {
-        setError("Client is required.");
-        return;
+        newErrors.client = ["Client is required."];
+        missing.push("Client");
+        hasError = true;
       }
       if (!form.assigned_advocate) {
-        setError("Assigned Advocate is required.");
-        return;
+        newErrors.assigned_advocate = ["Assigned Advocate is required."];
+        missing.push("Assigned Advocate");
+        hasError = true;
       }
       // Branch is only required for firm advocates (who have branches)
       if (!isAdvocate && !form.branch && options.branches.length > 0) {
-        setError("Branch is required.");
-        return;
+        newErrors.branch = ["Branch is required."];
+        missing.push("Branch");
+        hasError = true;
       }
+    }
+
+    if (hasError) {
+      setFieldErrors(newErrors);
+      setError(`Please fill ${missing.join(', ')} to continue.`);
+      return;
     }
 
     if (currentStep < STEPS.length - 1) {
@@ -341,12 +357,20 @@ export default function CaseAddForm({
         if (typeof data === 'object' && !data.detail) {
           setFieldErrors(data);
           const errorKeys = Object.keys(data);
-          if (errorKeys.some(k => ['case_title', 'case_type', 'case_number', 'category'].includes(k))) {
+          
+          const formatField = (key: string) => key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          const missingFields = errorKeys.map(formatField).join(', ');
+
+          if (errorKeys.some(k => ['court_name', 'filing_date', 'respondent_name'].includes(k))) {
             setCurrentStep(0);
-          } else if (errorKeys.some(k => ['client', 'assigned_advocate', 'branch'].includes(k))) {
+          } else if (errorKeys.some(k => ['case_title', 'case_type', 'case_number', 'category'].includes(k))) {
             setCurrentStep(1);
+          } else if (errorKeys.some(k => ['client', 'assigned_advocate', 'branch'].includes(k))) {
+            setCurrentStep(2);
+          } else {
+            setCurrentStep(3);
           }
-          throw new Error('Please check the highlighted fields.');
+          throw new Error(`Please fill ${missingFields} to continue.`);
         }
         throw new Error(data.detail || 'Failed to register case.');
       }
@@ -445,7 +469,7 @@ export default function CaseAddForm({
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 0:
+      case 1:
         return (
           <motion.div key="step0" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
             <Panel title="Matter Identity" subtitle="Primary title and legal classification.">
@@ -490,9 +514,13 @@ export default function CaseAddForm({
                         value={form.case_type}
                         onChange={e => set('case_type', e.target.value)}
                         placeholder="e.g. Intellectual Property"
-                        className="h-11 w-full rounded-xl border border-gray-100 bg-gray-50/50 pl-11 px-4 text-sm font-semibold text-gray-900 outline-none focus:bg-white focus:border-[#0e2340] transition-all"
+                        className={classNames(
+                          "h-11 w-full rounded-xl border pl-11 px-4 text-sm font-semibold text-gray-900 outline-none transition-all",
+                          fieldErrors.case_type ? "border-red-200 bg-red-50/50" : "border-gray-100 bg-gray-50/50 focus:bg-white focus:border-[#0e2340] focus:ring-4 focus:ring-[#0e2340]/5"
+                        )}
                       />
                     </div>
+                    {fieldErrors.case_type && <p className="text-[10px] text-red-500 font-bold ml-1">{fieldErrors.case_type[0]}</p>}
                   </div>
                 </div>
 
@@ -534,7 +562,7 @@ export default function CaseAddForm({
             </Panel>
           </motion.div>
         );
-      case 1:
+      case 2:
         return (
           <motion.div key="step1" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
             <Panel title="Assignments" subtitle="Clients and personnel allocation.">
@@ -547,13 +575,17 @@ export default function CaseAddForm({
                       required
                       value={form.client}
                       onChange={e => set('client', e.target.value)}
-                      className="h-11 w-full appearance-none rounded-xl border border-gray-100 bg-gray-50/50 pl-11 pr-10 text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-[#0e2340] focus:ring-4 focus:ring-[#0e2340]/5 transition-all"
+                      className={classNames(
+                        "h-11 w-full appearance-none rounded-xl border pl-11 pr-10 text-sm font-semibold text-gray-800 outline-none transition-all",
+                        fieldErrors.client ? "border-red-200 bg-red-50/50" : "border-gray-100 bg-gray-50/50 focus:bg-white focus:border-[#0e2340] focus:ring-4 focus:ring-[#0e2340]/5"
+                      )}
                     >
                       <option value="">Select a Client</option>
                       {options.clients.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>
+                  {fieldErrors.client && <p className="text-[10px] text-red-500 font-bold ml-1">{fieldErrors.client[0]}</p>}
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
@@ -566,17 +598,18 @@ export default function CaseAddForm({
                         value={form.assigned_advocate}
                         onChange={e => set('assigned_advocate', e.target.value)}
                         disabled={isAdvocate}
-                        className={`h-11 w-full appearance-none rounded-xl border border-gray-100 pl-11 pr-10 text-sm font-semibold text-gray-800 outline-none transition-all ${
-                          isAdvocate 
-                            ? 'bg-gray-100 cursor-not-allowed opacity-75' 
-                            : 'bg-gray-50/50 focus:bg-white focus:border-[#0e2340]'
-                        }`}
+                        className={classNames(
+                          "h-11 w-full appearance-none rounded-xl border pl-11 pr-10 text-sm font-semibold text-gray-800 outline-none transition-all",
+                          isAdvocate ? 'bg-gray-100 cursor-not-allowed opacity-75' : '',
+                          fieldErrors.assigned_advocate ? "border-red-200 bg-red-50/50" : "border-gray-100 bg-gray-50/50 focus:bg-white focus:border-[#0e2340] focus:ring-4 focus:ring-[#0e2340]/5"
+                        )}
                       >
                         <option value="">Select Advocate</option>
                         {options.advocates.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
                       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                     </div>
+                    {fieldErrors.assigned_advocate && <p className="text-[10px] text-red-500 font-bold ml-1">{fieldErrors.assigned_advocate[0]}</p>}
                     {isAdvocate && (
                       <p className="text-xs text-gray-500 mt-1">
                         You are automatically assigned as the advocate for this case
@@ -609,17 +642,18 @@ export default function CaseAddForm({
                         value={form.branch}
                         onChange={e => set('branch', e.target.value)}
                         disabled={isFirmAdmin && !!form.branch}
-                        className={`h-11 w-full appearance-none rounded-xl border border-gray-100 pl-11 pr-10 text-sm font-semibold text-gray-800 outline-none transition-all ${
-                          (isFirmAdmin && !!form.branch) 
-                            ? 'bg-gray-100 cursor-not-allowed opacity-75' 
-                            : 'bg-gray-50/50 focus:bg-white focus:border-[#0e2340]'
-                        }`}
+                        className={classNames(
+                          "h-11 w-full appearance-none rounded-xl border pl-11 pr-10 text-sm font-semibold text-gray-800 outline-none transition-all",
+                          (isFirmAdmin && !!form.branch) ? 'bg-gray-100 cursor-not-allowed opacity-75' : '',
+                          fieldErrors.branch ? "border-red-200 bg-red-50/50" : "border-gray-100 bg-gray-50/50 focus:bg-white focus:border-[#0e2340] focus:ring-4 focus:ring-[#0e2340]/5"
+                        )}
                       >
                         <option value="">Select Branch</option>
                         {options.branches.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
                       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                     </div>
+                    {fieldErrors.branch && <p className="text-[10px] text-red-500 font-bold ml-1">{fieldErrors.branch[0]}</p>}
                     {isFirmAdmin && form.branch && (
                       <p className="text-[10px] text-gray-400 mt-1 font-medium italic">
                         Matter locked to your assigned branch
@@ -632,7 +666,7 @@ export default function CaseAddForm({
             </Panel>
           </motion.div>
         );
-      case 2:
+      case 0:
         return (
           <motion.div key="step2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
             <Panel title="Court Information" subtitle="Legal jurisdiction and timeline.">

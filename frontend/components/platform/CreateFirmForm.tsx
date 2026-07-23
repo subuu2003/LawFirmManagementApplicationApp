@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, PlusCircle, Loader2, CheckCircle2, AlertCircle, ChevronDown, Globe, Phone, Save, X, Briefcase, Mail, Link as LinkIcon, MapPin, Upload } from 'lucide-react';
 import { customFetch } from '@/lib/fetch';
@@ -20,6 +20,8 @@ export default function CreateFirmForm() {
   });
   const [phoneCode, setPhoneCode] = useState('+91');
   const [phoneFlag, setPhoneFlag] = useState('🇮🇳');
+  
+  const randomSuffix = useRef(Math.floor(1000 + Math.random() * 9000).toString());
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -59,6 +61,12 @@ export default function CreateFirmForm() {
       // Reset dependent fields
       if (key === 'country') { next.state = ''; next.city = ''; }
       if (key === 'state') { next.city = ''; }
+      
+      if (key === 'firm_name') {
+        const prefix = val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+        next.firm_code = prefix ? `${prefix}-${randomSuffix.current}` : '';
+      }
+      
       return next;
     });
     setError('');
@@ -196,12 +204,11 @@ export default function CreateFirmForm() {
                       <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-[#0e2340] transition-colors" />
                       <input
                         value={form.firm_code}
-                        onChange={e => set('firm_code', e.target.value)}
-                        placeholder="e.g. CHEN2024"
-                        required
+                        readOnly
+                        placeholder="Auto-generated"
                         className={classNames(
-                          "h-11 w-full rounded-xl border pl-11 px-4 text-sm font-semibold outline-none transition-all uppercase",
-                          fieldErrors.firm_code ? "border-red-200 bg-red-50/50 text-red-900 placeholder:text-red-300" : "border-gray-100 bg-gray-50/50 text-gray-800 focus:bg-white focus:border-[#0e2340] focus:ring-4 focus:ring-[#0e2340]/5"
+                          "h-11 w-full rounded-xl border pl-11 px-4 text-sm font-semibold outline-none transition-all uppercase bg-gray-50 cursor-not-allowed opacity-75",
+                          fieldErrors.firm_code ? "border-red-200 text-red-900" : "border-gray-100 text-gray-800"
                         )}
                       />
                     </div>

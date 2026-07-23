@@ -20,7 +20,7 @@ const navItems = [
   { label: 'My Paralegals', path: '/advocate/paralegals', icon: UserCog },
   { label: 'Cases', path: '/advocate/cases', icon: Briefcase },
   { label: 'Documents', path: '/advocate/documents', icon: FileText },
-  { label: 'Drafting', path: '/advocate/drafting', icon: PenTool },
+  { label: 'Case Workspace', path: '/advocate/drafting', icon: PenTool },
   { label: 'Calendar', path: '/advocate/calendar', icon: Calendar },
   { label: 'Time & Billing', path: '/advocate/billing', icon: IndianRupee },
   { label: 'Client Chat', path: '/advocate/chat', icon: MessageSquare },

@@ -116,6 +116,11 @@ class UserDocument(models.Model):
         ('reply', 'Reply'),
         ('rejoinder', 'Rejoinder'),
         ('other', 'Other Document'),
+
+        # Drafting & Research (Docu Mind)
+        ('drafting', 'Drafting (Docu Mind)'),
+        ('research_notes', 'Research Notes'),
+        ('case_draft', 'Case Draft'),
     ]
     
     VERIFICATION_STATUS_CHOICES = [
