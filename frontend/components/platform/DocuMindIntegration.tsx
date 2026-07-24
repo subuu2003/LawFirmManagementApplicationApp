@@ -5,8 +5,35 @@ import toast from 'react-hot-toast';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 
-const DOCU_MIND_URL = process.env.NEXT_PUBLIC_DOCU_MIND_URL || 'http://localhost:3001';
-const LAWFIRM_APP_URL = process.env.NEXT_PUBLIC_LAWFIRM_APP_URL || '';
+function resolveDocuMindUrl() {
+  if (process.env.NEXT_PUBLIC_DOCU_MIND_URL) {
+    return process.env.NEXT_PUBLIC_DOCU_MIND_URL;
+  }
+
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3001';
+    }
+  }
+
+  return 'https://mindmap.diracai.com';
+}
+
+function resolveLawfirmAppUrl() {
+  if (process.env.NEXT_PUBLIC_LAWFIRM_APP_URL) {
+    return process.env.NEXT_PUBLIC_LAWFIRM_APP_URL;
+  }
+
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+
+  return 'https://antlegal.anthemgt.com';
+}
+
+const DOCU_MIND_URL = resolveDocuMindUrl();
+const LAWFIRM_APP_URL = resolveLawfirmAppUrl();
 
 function getOrigin(value: string) {
   try {
