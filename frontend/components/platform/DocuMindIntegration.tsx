@@ -43,7 +43,7 @@ export function DocuMindIntegration({ caseId, initialDraftUrl }: DocuMindIntegra
             const data = await caseDocsRes.json();
             const docs = Array.isArray(data) ? data : (data.results || []);
             const latestDraft = docs
-              .filter((d: any) => d.document_type === 'Drafting' && d.document?.endsWith('.json'))
+              .filter((d: any) => d.document_type === 'drafting' && d.document?.endsWith('.json'))
               .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
             
             if (latestDraft && latestDraft.document) {
