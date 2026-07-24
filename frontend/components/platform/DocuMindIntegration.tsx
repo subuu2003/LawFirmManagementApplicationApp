@@ -70,11 +70,11 @@ export function DocuMindIntegration({ caseId, initialDraftUrl }: DocuMindIntegra
             const data = await caseDocsRes.json();
             const docs = Array.isArray(data) ? data : (data.results || []);
             const latestDraft = docs
-              .filter((d: any) => d.document_type === 'drafting' && d.document?.endsWith('.json'))
-              .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
+              .filter((d: any) => d.document_type === 'drafting' && d.file_url?.endsWith('.json'))
+              .sort((a: any, b: any) => new Date(b.uploaded_at || b.updated_at || 0).getTime() - new Date(a.uploaded_at || a.updated_at || 0).getTime())[0];
             
-            if (latestDraft && latestDraft.document) {
-              fetchUrl = latestDraft.document;
+            if (latestDraft && latestDraft.file_url) {
+              fetchUrl = latestDraft.file_url;
             }
           }
         }
@@ -116,8 +116,8 @@ export function DocuMindIntegration({ caseId, initialDraftUrl }: DocuMindIntegra
 
           const formData = new FormData();
           formData.append('case', caseId);
-          formData.append('document', blob, filename || `draft.${format || 'pdf'}`);
-          formData.append('title', filename ? filename.replace(/\.[^/.]+$/, "") : 'Docu Mind Draft');
+          formData.append('document_file', blob, filename || `draft.${format || 'pdf'}`);
+          formData.append('document_title', filename ? filename.replace(/\.[^/.]+$/, "") : 'Docu Mind Draft');
           formData.append('document_type', 'drafting');
 
           const response = await customFetch(API.DOCUMENTS.LIST, {
