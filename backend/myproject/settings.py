@@ -274,3 +274,7 @@ OTP_TEST_CODE = os.getenv("OTP_TEST_CODE", "999999")
 # E-Courts API Configuration
 ECOURTS_API_KEY = os.getenv("ECOURTS_API_KEY", "")
 ECOURTS_BASE_URL = os.getenv("ECOURTS_BASE_URL", "https://apis.akshit.net/eciapi/17")
+
+# File Upload Size Configuration (50 MB Limit)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
