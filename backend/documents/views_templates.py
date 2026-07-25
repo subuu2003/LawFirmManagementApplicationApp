@@ -18,6 +18,9 @@ from .serializers_templates import (
 )
 from cases.models import Case
 from clients.models import Client
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CourtFormTemplateViewSet(viewsets.ModelViewSet):
@@ -282,15 +285,19 @@ class FilledCourtFormViewSet(viewsets.ModelViewSet):
         from cases.models import Case
         case = get_object_or_404(Case, id=case_id)
         
-        from .utils_pdf import PDFService
-        pdf_bytes = PDFService.merge_case_forms(case)
-        
-        if not pdf_bytes:
-            return Response({'error': 'Could not generate PDF'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        try:
+            from .utils_pdf import PDFService
+            pdf_bytes = PDFService.merge_case_forms(case)
             
-        response = HttpResponse(pdf_bytes, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Case_{case.case_number}_Filing_Pack.pdf"'
-        return response
+            if not pdf_bytes:
+                return Response({'error': 'Could not generate PDF'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="Case_{case.case_number}_Filing_Pack.pdf"'
+            return response
+        except Exception as e:
+            logger.error(f"Error in download_master_pdf for case {case_id}: {e}", exc_info=True)
+            return Response({'error': f'Failed to generate PDF: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['get'])
     def preview_filing_pack(self, request):
@@ -306,13 +313,18 @@ class FilledCourtFormViewSet(viewsets.ModelViewSet):
         from cases.models import Case
         case = get_object_or_404(Case, id=case_id)
         
-        from .utils_pdf import PDFService
-        preview_data = PDFService.get_preview_data(case)
-        
-        if not preview_data:
-            return Response({'error': 'No documents found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        return Response(preview_data)
+        try:
+            from .utils_pdf import PDFService
+            preview_data = PDFService.get_preview_data(case)
+            
+            if not preview_data:
+                return Response({'error': 'No documents found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            return Response(preview_data)
+        except Exception as e:
+            logger.error(f"Error in preview_filing_pack for case {case_id}: {e}", exc_info=True)
+            return Response({'error': f'Failed to generate preview: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     
     @action(detail=True, methods=['post'])
     def share_with_client(self, request, pk=None):
