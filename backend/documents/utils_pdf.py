@@ -44,23 +44,41 @@ class PDFService:
     @staticmethod
     def link_callback(uri, rel):
         """
-        Convert HTML URIs to absolute system paths so xhtml2pdf can find those files
+        Convert HTML URIs to absolute system paths so xhtml2pdf can find those files.
+        Safely downloads remote URLs (S3 / DigitalOcean Spaces) to temporary files.
         """
         import os
+        import tempfile
+        import requests
         from django.conf import settings
         
         try:
+            # Handle remote HTTP / HTTPS URLs (e.g. DigitalOcean Spaces / S3 media URLs)
+            if uri.startswith(('http://', 'https://')):
+                try:
+                    res = requests.get(uri, timeout=3, verify=False)
+                    if res.status_code == 200:
+                        suffix = os.path.splitext(uri.split('?')[0])[1] or '.png'
+                        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+                        tmp.write(res.content)
+                        tmp.close()
+                        return tmp.name
+                except Exception as req_err:
+                    logger.warning(f"Failed to fetch remote image {uri}: {req_err}")
+                    return ""
+
             media_url = getattr(settings, 'MEDIA_URL', '')
             media_root = getattr(settings, 'MEDIA_ROOT', '')
             static_url = getattr(settings, 'STATIC_URL', '')
             static_root = getattr(settings, 'STATIC_ROOT', '')
 
+            path = None
             # Handle media files
-            if media_url and uri.startswith(media_url):
+            if media_url and uri.startswith(media_url) and media_root:
                 relative_path = uri.replace(media_url, "", 1)
                 path = os.path.join(media_root, relative_path)
             # Handle static files
-            elif static_url and uri.startswith(static_url):
+            elif static_url and uri.startswith(static_url) and static_root:
                 relative_path = uri.replace(static_url, "", 1)
                 path = os.path.join(static_root, relative_path)
             else:
@@ -69,10 +87,11 @@ class PDFService:
                     path = uri
                 else:
                     base_dir = getattr(settings, 'BASE_DIR', '')
-                    path = os.path.join(base_dir, uri)
+                    if base_dir:
+                        path = os.path.join(base_dir, uri)
 
             # make sure that file exists
-            if os.path.exists(path) and os.path.isfile(path):
+            if path and os.path.exists(path) and os.path.isfile(path):
                 return path
         except Exception as e:
             logger.warning(f"Error resolving path in link_callback for uri {uri}: {e}")
