@@ -7,7 +7,7 @@ import {
   Scale, LayoutDashboard, Briefcase, FileText,
   Calendar, MessageSquare, LogOut, ChevronRight, PenTool, Users, Plus,
   UserCheck, Settings, X, IndianRupee, UserCog, Building2, ChevronDown,
-  Check, RefreshCw, ArrowLeftRight
+  Check, RefreshCw, ArrowLeftRight, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTopbar } from '@/components/platform/TopbarContext';
@@ -28,7 +28,7 @@ const navItems = [
 
 export default function AdvocateSidebar() {
   const router = useRouter();
-  const { isSidebarOpen, closeSidebar } = useTopbar();
+  const { isSidebarOpen, closeSidebar, isCollapsed, toggleCollapse } = useTopbar();
   const pathname = usePathname();
   const isActive = (path: string) => pathname.startsWith(path);
 
@@ -74,19 +74,16 @@ export default function AdvocateSidebar() {
       });
       const data = await res.json();
       if (res.ok) {
-        // Update local state
         setAvailableFirms(prev =>
           prev.map(f => ({ ...f, is_last_active: f.id === membership.id }))
         );
         setActiveFirm(membership);
 
-        // Persist updated user to localStorage
         if (data.user) {
           localStorage.setItem('user_details', JSON.stringify(data.user));
         }
 
         setShowFirmSwitcher(false);
-        // Full page reload so all data (cases, clients, etc.) refreshes
         window.location.href = '/advocate/dashboard';
       }
     } catch (e) {
@@ -112,16 +109,27 @@ export default function AdvocateSidebar() {
     name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'F';
 
   const sidebarContent = (
-    <aside className="w-64 h-full bg-white border-r border-gray-100 flex flex-col overflow-hidden">
-      <div className="px-6 py-6 border-b border-gray-100 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-[#2d0b25] rounded-lg flex items-center justify-center shadow-md">
-            <Scale className="w-4 h-4 text-white" />
+    <aside className={`${isCollapsed ? 'w-20' : 'w-64'} h-full bg-white border-r border-gray-100 flex flex-col overflow-hidden transition-all duration-300`}>
+      <div className={`px-4 py-5 border-b border-gray-100 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+        {!isCollapsed && (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 bg-[#2d0b25] rounded-lg flex items-center justify-center shadow-md shrink-0">
+              <Scale className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-bold text-lg text-gray-950 tracking-tight truncate">
+              Advocate<span className="text-[#2d0b25]">Portal</span>
+            </span>
           </div>
-          <span className="font-bold text-lg text-gray-950 tracking-tight">
-            Advocate<span className="text-[#2d0b25]">Portal</span>
-          </span>
-        </div>
+        )}
+
+        <button
+          onClick={toggleCollapse}
+          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          className="hidden lg:flex p-2 rounded-xl text-gray-700 hover:text-gray-950 hover:bg-gray-100 transition-colors"
+        >
+          {isCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+        </button>
+
         <button onClick={closeSidebar} className="lg:hidden p-2 text-gray-700 hover:text-gray-950">
           <X className="w-5 h-5" />
         </button>
@@ -132,44 +140,51 @@ export default function AdvocateSidebar() {
         <div className="px-3 pt-3 pb-1">
           <button
             onClick={() => setShowFirmSwitcher(true)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[#2d0b25]/5 hover:bg-[#2d0b25]/10 border border-[#2d0b25]/10 transition-all group"
+            title={isCollapsed ? (activeFirm?.firm_name || 'My Firm') : undefined}
+            className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-xl bg-[#2d0b25]/5 hover:bg-[#2d0b25]/10 border border-[#2d0b25]/10 transition-all group`}
           >
             <div className="w-8 h-8 rounded-lg bg-[#2d0b25] flex items-center justify-center text-white text-[11px] font-bold shrink-0">
               {firmInitials(activeFirm?.firm_name || '')}
             </div>
-            <div className="flex-1 text-left min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#2d0b25]/50">Active Firm</p>
-              <p className="text-xs font-bold text-[#2d0b25] truncate">{activeFirm?.firm_name || 'My Firm'}</p>
-            </div>
-            {availableFirms.length > 1 && (
-              <ArrowLeftRight className="w-3.5 h-3.5 text-[#2d0b25]/40 group-hover:text-[#2d0b25] transition-colors shrink-0" />
+            {!isCollapsed && (
+              <>
+                <div className="flex-1 text-left min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#2d0b25]/50">Active Firm</p>
+                  <p className="text-xs font-bold text-[#2d0b25] truncate">{activeFirm?.firm_name || 'My Firm'}</p>
+                </div>
+                {availableFirms.length > 1 && (
+                  <ArrowLeftRight className="w-3.5 h-3.5 text-[#2d0b25]/40 group-hover:text-[#2d0b25] transition-colors shrink-0" />
+                )}
+              </>
             )}
           </button>
         </div>
       )}
 
       <nav className="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
-        <div className="px-3 mb-3 lg:hidden">
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-800">
-            Advocate
-          </span>
-        </div>
+        {!isCollapsed && (
+          <div className="px-3 mb-3 lg:hidden">
+            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-800">
+              Advocate
+            </span>
+          </div>
+        )}
 
         {navItems.map(({ label, path, icon: Icon }) => {
           const active = isActive(path);
           return (
-            <Link key={path} href={path} onClick={closeSidebar}>
-              <div className={`group relative flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${active ? 'bg-[#2d0b25]/10 text-[#2d0b25]' : 'text-gray-900 hover:bg-gray-50 hover:text-black'
+            <Link key={path} href={path} onClick={closeSidebar} title={isCollapsed ? label : undefined}>
+              <div className={`group relative flex items-center ${isCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${active ? 'bg-[#2d0b25]/10 text-[#2d0b25]' : 'text-gray-900 hover:bg-gray-50 hover:text-black'
                 }`}>
                 {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-r-full bg-[#2d0b25]" />}
-                <div className="flex items-center gap-3">
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${active ? 'bg-[#2d0b25]/15' : 'bg-gray-100 group-hover:bg-gray-200'
                     }`}>
                     <Icon className={`w-4 h-4 ${active ? 'text-[#2d0b25]' : 'text-gray-700 group-hover:text-gray-900'}`} />
                   </div>
-                  <span className="text-sm font-semibold">{label}</span>
+                  {!isCollapsed && <span className="text-sm font-semibold">{label}</span>}
                 </div>
-                {active && <ChevronRight className="w-3.5 h-3.5 text-[#2d0b25]/40" />}
+                {active && !isCollapsed && <ChevronRight className="w-3.5 h-3.5 text-[#2d0b25]/40" />}
               </div>
             </Link>
           );
@@ -177,10 +192,10 @@ export default function AdvocateSidebar() {
 
         {/* Create Case Button */}
         <div className="pt-3 mt-3 border-t border-gray-100">
-          <Link href="/advocate/cases/new" onClick={closeSidebar}>
-            <div className="group relative flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#2d0b25] text-white hover:bg-[#1a0616] transition-all duration-200 cursor-pointer shadow-sm">
-              <Plus className="w-4 h-4" />
-              <span className="text-sm font-semibold">Create Case</span>
+          <Link href="/advocate/cases/new" onClick={closeSidebar} title={isCollapsed ? "Create Case" : undefined}>
+            <div className={`group relative flex items-center justify-center gap-2 ${isCollapsed ? 'px-0 py-2.5' : 'px-3 py-2.5'} rounded-xl bg-[#2d0b25] text-white hover:bg-[#1a0616] transition-all duration-200 cursor-pointer shadow-sm`}>
+              <Plus className="w-4 h-4 shrink-0" />
+              {!isCollapsed && <span className="text-sm font-semibold">Create Case</span>}
             </div>
           </Link>
         </div>
@@ -189,27 +204,29 @@ export default function AdvocateSidebar() {
         {(isActive('/advocate/profile') || isActive('/advocate/settings')) && (
           <>
             <div className="my-3 border-t border-gray-100" />
-            <div className="px-3 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-800">Account Context</span>
-            </div>
+            {!isCollapsed && (
+              <div className="px-3 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-800">Account Context</span>
+              </div>
+            )}
             {[
               { label: 'Profile', path: '/advocate/profile', icon: UserCheck },
               { label: 'Settings', path: '/advocate/settings', icon: Settings }
             ].map(({ label, path, icon: Icon }) => {
               const active = isActive(path);
               return (
-                <Link key={path} href={path} onClick={closeSidebar}>
-                  <div className={`group relative flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${active ? 'bg-[#2d0b25]/10 text-[#2d0b25]' : 'text-gray-900 hover:bg-gray-50 hover:text-black'
+                <Link key={path} href={path} onClick={closeSidebar} title={isCollapsed ? label : undefined}>
+                  <div className={`group relative flex items-center ${isCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${active ? 'bg-[#2d0b25]/10 text-[#2d0b25]' : 'text-gray-900 hover:bg-gray-50 hover:text-black'
                     }`}>
                     {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-r-full bg-[#2d0b25]" />}
-                    <div className="flex items-center gap-3">
+                    <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${active ? 'bg-[#2d0b25]/15' : 'bg-gray-100 group-hover:bg-gray-200'
                         }`}>
                         <Icon className={`w-4 h-4 ${active ? 'text-[#2d0b25]' : 'text-gray-700 group-hover:text-gray-900'}`} />
                       </div>
-                      <span className="text-sm font-semibold">{label}</span>
+                      {!isCollapsed && <span className="text-sm font-semibold">{label}</span>}
                     </div>
-                    {active && <ChevronRight className="w-3.5 h-3.5 text-[#2d0b25]/40" />}
+                    {active && !isCollapsed && <ChevronRight className="w-3.5 h-3.5 text-[#2d0b25]/40" />}
                   </div>
                 </Link>
               );
@@ -218,10 +235,10 @@ export default function AdvocateSidebar() {
         )}
       </nav>
 
-      <div className="border-t border-gray-100 px-4 py-3">
-        <button onClick={handleLogout} className="flex items-center gap-2 text-red-500 hover:opacity-75 transition-opacity px-2">
-          <LogOut className="w-4 h-4" />
-          <span className="text-[13px] font-semibold">Sign Out</span>
+      <div className="border-t border-gray-100 px-3 py-3 flex justify-center">
+        <button onClick={handleLogout} title={isCollapsed ? "Sign Out" : undefined} className={`flex items-center ${isCollapsed ? 'justify-center w-full' : 'gap-2 px-2'} text-red-500 hover:opacity-75 transition-opacity`}>
+          <LogOut className="w-4 h-4 shrink-0" />
+          {!isCollapsed && <span className="text-[13px] font-semibold">Sign Out</span>}
         </button>
       </div>
     </aside>
@@ -229,7 +246,7 @@ export default function AdvocateSidebar() {
 
   return (
     <>
-      <div className="hidden lg:flex w-64 h-screen shrink-0 sticky top-0">
+      <div className={`hidden lg:flex ${isCollapsed ? 'w-20' : 'w-64'} h-screen shrink-0 sticky top-0 transition-all duration-300`}>
         {sidebarContent}
       </div>
 
@@ -260,7 +277,6 @@ export default function AdvocateSidebar() {
       <AnimatePresence>
         {showFirmSwitcher && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -269,7 +285,6 @@ export default function AdvocateSidebar() {
               className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             />
 
-            {/* Sheet */}
             <motion.div
               initial={{ opacity: 0, y: 40, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -277,7 +292,6 @@ export default function AdvocateSidebar() {
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
               className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden"
             >
-              {/* Header */}
               <div className="px-6 pt-6 pb-4 border-b border-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
@@ -293,7 +307,6 @@ export default function AdvocateSidebar() {
                 </div>
               </div>
 
-              {/* Firms List */}
               <div className="p-3 space-y-1.5 max-h-80 overflow-y-auto">
                 {availableFirms.map((membership) => {
                   const isCurrentFirm = membership.is_last_active;
@@ -308,13 +321,11 @@ export default function AdvocateSidebar() {
                         : 'hover:bg-gray-50 border border-transparent hover:border-gray-200'
                         }`}
                     >
-                      {/* Firm Avatar */}
                       <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold shadow-sm shrink-0 ${isCurrentFirm ? 'bg-[#2d0b25] text-white' : 'bg-gray-100 text-gray-600 group-hover:bg-[#2d0b25]/10 group-hover:text-[#2d0b25]'
                         }`}>
                         {firmInitials(membership.firm_name)}
                       </div>
 
-                      {/* Firm Info */}
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-bold truncate ${isCurrentFirm ? 'text-[#2d0b25]' : 'text-gray-800'}`}>
                           {membership.firm_name}
@@ -325,7 +336,6 @@ export default function AdvocateSidebar() {
                         </p>
                       </div>
 
-                      {/* Status */}
                       <div className="shrink-0">
                         {isLoading ? (
                           <RefreshCw className="w-4 h-4 text-[#2d0b25] animate-spin" />
@@ -345,7 +355,6 @@ export default function AdvocateSidebar() {
                 })}
               </div>
 
-              {/* Footer */}
               <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50">
                 <p className="text-[11px] font-semibold text-gray-400 text-center">
                   Switching firms reloads your entire workspace — cases, clients, and documents.

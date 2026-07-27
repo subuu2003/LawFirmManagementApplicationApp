@@ -87,7 +87,7 @@ export default function PartnerManagerPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Total Managers', value: users.length, color: 'bg-[#6C5CE7]' },
           { label: 'Active', value: users.filter(u => u.status === 'Active').length, color: 'bg-emerald-500' },
