@@ -189,16 +189,21 @@ class PlatformInvoice(models.Model):
         ]
     
     def save(self, *args, **kwargs):
-        # Auto-calculate amounts
-        if self.plan_amount and self.tax_percentage:
-            self.tax_amount = self.plan_amount * (self.tax_percentage / 100)
-            self.total_amount = self.plan_amount + self.tax_amount
-            self.balance_due = self.total_amount - self.paid_amount
+        # Auto-calculate amounts safely with Decimal defaults
+        plan_amt = self.plan_amount if self.plan_amount is not None else Decimal('0.00')
+        tax_pct = self.tax_percentage if self.tax_percentage is not None else Decimal('18.00')
+        
+        self.tax_amount = plan_amt * (tax_pct / Decimal('100.00'))
+        if self.total_amount is None:
+            self.total_amount = plan_amt + self.tax_amount
+            
+        paid_amt = self.paid_amount if self.paid_amount is not None else Decimal('0.00')
+        self.balance_due = self.total_amount - paid_amt
         
         # Auto-update status based on payment and due date
-        if self.paid_amount >= self.total_amount:
+        if self.total_amount is not None and paid_amt >= self.total_amount:
             self.status = 'paid'
-        elif self.due_date < timezone.now().date() and self.status not in ['paid', 'cancelled']:
+        elif self.due_date and self.due_date < timezone.now().date() and self.status not in ['paid', 'cancelled']:
             self.status = 'overdue'
         
         super().save(*args, **kwargs)

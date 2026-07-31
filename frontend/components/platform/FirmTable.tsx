@@ -136,16 +136,16 @@ export default function FirmTable() {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm lg:overflow-visible overflow-hidden">
-      {/* Table header */}
-      <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col w-full">
+      {/* Control / Filter Bar */}
+      <div className="p-4 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3 bg-slate-50/50">
         <div>
-          <h2 className="text-sm font-bold text-[#0e2340]">Registered Firms</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{firms.length} firms total · {firms.filter(f => f.is_active).length} active</p>
+          <h2 className="text-sm font-black text-slate-900">Registered Firms</h2>
+          <p className="text-xs font-semibold text-slate-400 mt-0.5">{firms.length} firms total · {firms.filter(f => f.is_active).length} active</p>
         </div>
         {/* Search */}
-        <div className="flex w-full items-center gap-2 rounded-xl border border-gray-100 bg-[#f7f8fa] px-3 py-2 transition-[width] duration-300 sm:w-60 sm:focus-within:w-[45vw] lg:focus-within:w-[40rem]">
-          <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+        <div className="relative w-full sm:w-64">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={query}
             onChange={(e) => {
@@ -153,20 +153,20 @@ export default function FirmTable() {
               setPage(1);
             }}
             placeholder="Search firms…"
-            className="bg-transparent text-sm text-gray-600 placeholder:text-gray-400 outline-none w-full"
+            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 font-medium focus:outline-none focus:border-blue-500 shadow-sm placeholder:text-slate-400"
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto lg:overflow-visible">
-        <table className="w-full min-w-[780px]">
-          <thead>
-            <tr className="border-b border-gray-100 bg-[#f7f8fa]">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-[780px]">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-slate-50 border-b border-slate-200">
               {['Sl. No', 'Firm', 'Code', 'City', 'Super Admin', 'Subscription', 'Status', 'Joined', 'View', ''].map((h) => (
                 <th
                   key={h}
-                  className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400"
+                  className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider text-left"
                 >
                   {h}
                 </th>
@@ -174,16 +174,16 @@ export default function FirmTable() {
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-slate-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-12 text-sm text-gray-400">
+                <td colSpan={9} className="text-center py-12 text-sm font-semibold text-slate-400">
                   No firms match your search.
                 </td>
               </tr>
             ) : (
               paged.map((firm, index) => (
-                <tr key={firm.id} className="hover:bg-[#f7f8fa]/60 transition-colors">
+                <tr key={firm.id} className="hover:bg-slate-50/80 transition-colors group cursor-pointer">
                   <td className="px-5 py-4 text-sm font-semibold text-gray-700">
                     {(safePage - 1) * pageSize + index + 1}
                   </td>

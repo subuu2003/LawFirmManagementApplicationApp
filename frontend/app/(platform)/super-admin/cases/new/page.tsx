@@ -4,7 +4,7 @@ import CaseAddForm from '@/components/platform/CaseAddForm';
 import { useTopbarTitle } from '@/components/platform/TopbarContext';
 
 export default function AddCasePage() {
-  useTopbarTitle('Register New Matter', 'Assign legal classification, personnel, and branch allocation.');
+  useTopbarTitle('Create New Case', 'Register a new matter and assign it to your team');
 
   return (
     <div className="space-y-6">

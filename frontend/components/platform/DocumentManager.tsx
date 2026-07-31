@@ -386,7 +386,7 @@ export default function DocumentManager({ accent, userId, clientId, caseId, show
           {documents.map((doc) => (
             <div
               key={doc.id}
-              className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-100 hover:border-gray-200 transition-colors"
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white rounded-xl border border-gray-100 hover:border-gray-200 transition-colors"
             >
               <div className="flex items-start gap-3 flex-1">
                 <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">

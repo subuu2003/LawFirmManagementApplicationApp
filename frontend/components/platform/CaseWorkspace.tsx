@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   Briefcase, Gavel, FileText, ClipboardList,
@@ -204,13 +205,18 @@ export function CaseWorkspace({
     <div className="flex flex-col w-full pb-12">
 
       {/* Top Actions & Breadcrumbs */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <div className="flex items-center text-sm text-gray-500">
-          <span className="hover:text-gray-900 cursor-pointer">Cases</span>
-          <ChevronRight className="w-4 h-4 mx-2" />
-          <span className="text-gray-900 font-medium">Case Detail</span>
+          <Link
+            href={viewBase}
+            className="text-slate-600 hover:text-blue-600 font-semibold transition-colors cursor-pointer"
+          >
+            Cases
+          </Link>
+          <ChevronRight className="w-4 h-4 mx-2 text-slate-400" />
+          <span className="text-gray-900 font-bold">Case Detail</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           {role !== 'client' && (
             <>
               <button className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2">
