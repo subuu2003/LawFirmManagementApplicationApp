@@ -11,7 +11,7 @@ import {
   Scale, LayoutDashboard, Building2, BarChart3,
   Settings, ChevronRight, LogOut, Users,
   TrendingUp, ChevronDown, UserCheck, CreditCard,
-  ShieldCheck, X, IndianRupee, FileText, Receipt, Calendar
+  ShieldCheck, X, IndianRupee, FileText, Receipt, Calendar, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTopbar } from '@/components/platform/TopbarContext';
@@ -40,7 +40,7 @@ const financeSubItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isSidebarOpen, closeSidebar } = useTopbar();
+  const { isSidebarOpen, closeSidebar, isCollapsed, toggleCollapse } = useTopbar();
 
   const [userMenuOpen, setUserMenuOpen] = useState(
     () => pathname.startsWith('/platform-owner/users/super-admin') ||
@@ -72,25 +72,18 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     try {
-      // Intentionally call the backend to invalidate the token on the server side
       await customFetch(API.AUTH.LOGOUT, { method: 'POST' });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Regardless of backend response, scrub local credentials to enforce logout natively
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user_details');
       router.push('/login');
     }
   };
 
-  const userSectionActive =
-    pathname.startsWith('/platform-owner/firms') ||
-    pathname.startsWith('/platform-owner/partners') ||
-    pathname.startsWith('/platform-owner/sales');
-
   const navRow = (active: boolean) =>
-    `group relative flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${active ? 'bg-[#071526]/8 text-[#071526]' : 'text-gray-900 hover:bg-gray-50 hover:text-black'
+    `group relative flex items-center ${isCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${active ? 'bg-[#071526]/8 text-[#071526]' : 'text-gray-900 hover:bg-gray-50 hover:text-black'
     }`;
   const iconBox = (active: boolean) =>
     `w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${active ? 'bg-[#071526]/10' : 'bg-gray-100 group-hover:bg-gray-200'
@@ -99,17 +92,28 @@ export default function Sidebar() {
     `w-4 h-4 ${active ? 'text-[#071526]' : 'text-gray-700 group-hover:text-gray-900'}`;
 
   const sidebarContent = (
-    <aside className="w-64 h-full bg-white border-r border-gray-100 flex flex-col overflow-hidden">
+    <aside className={`${isCollapsed ? 'w-20' : 'w-64'} h-full bg-white border-r border-gray-100 flex flex-col overflow-hidden transition-all duration-300`}>
       {/* Logo */}
-      <div className="px-6 py-6 border-b border-gray-100 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-[#071526] rounded-lg flex items-center justify-center shadow-md">
-            <Scale className="w-4 h-4 text-white" />
+      <div className={`px-4 py-5 border-b border-gray-100 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+        {!isCollapsed && (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 bg-[#071526] rounded-lg flex items-center justify-center shadow-md shrink-0">
+              <Scale className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-bold text-lg text-gray-950 tracking-tight truncate">
+              Ant<span className="text-[#071526]">Legal</span>
+            </span>
           </div>
-          <span className="font-bold text-lg text-gray-950 tracking-tight">
-            Ant<span className="text-[#071526]">Legal</span>
-          </span>
-        </div>
+        )}
+
+        <button
+          onClick={toggleCollapse}
+          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          className="hidden lg:flex p-2 rounded-xl text-gray-700 hover:text-gray-950 hover:bg-gray-100 transition-colors"
+        >
+          {isCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+        </button>
+
         <button onClick={closeSidebar} className="lg:hidden p-2 text-gray-700 hover:text-gray-950">
           <X className="w-5 h-5" />
         </button>
@@ -117,24 +121,26 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
-        <div className="px-3 mb-3 lg:hidden">
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-800">
-            Platform Owner
-          </span>
-        </div>
+        {!isCollapsed && (
+          <div className="px-3 mb-3 lg:hidden">
+            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-800">
+              Platform Owner
+            </span>
+          </div>
+        )}
 
         {/* Main Nav Items */}
         {navItems.map(({ label, path, icon: Icon }) => {
           const active = isActive(path);
           return (
-            <Link key={path} href={path} onClick={closeSidebar}>
+            <Link key={path} href={path} onClick={closeSidebar} title={isCollapsed ? label : undefined}>
               <div className={navRow(active)}>
                 {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-r-full bg-[#071526]" />}
-                <div className="flex items-center gap-3">
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                   <div className={iconBox(active)}><Icon className={iconColor(active)} /></div>
-                  <span className="text-sm font-semibold">{label}</span>
+                  {!isCollapsed && <span className="text-sm font-semibold">{label}</span>}
                 </div>
-                {active && <ChevronRight className="w-3.5 h-3.5 text-[#071526]/40" />}
+                {active && !isCollapsed && <ChevronRight className="w-3.5 h-3.5 text-[#071526]/40" />}
               </div>
             </Link>
           );
@@ -144,14 +150,14 @@ export default function Sidebar() {
         {(() => {
           const active = pathname.startsWith('/platform-owner/firms');
           return (
-            <Link href="/platform-owner/firms" onClick={closeSidebar}>
+            <Link href="/platform-owner/firms" onClick={closeSidebar} title={isCollapsed ? "Firms" : undefined}>
               <div className={navRow(active)}>
                 {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-r-full bg-[#071526]" />}
-                <div className="flex items-center gap-3">
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                   <div className={iconBox(active)}><Building2 className={iconColor(active)} /></div>
-                  <span className="text-sm font-semibold">Firms</span>
+                  {!isCollapsed && <span className="text-sm font-semibold">Firms</span>}
                 </div>
-                {active && <ChevronRight className="w-3.5 h-3.5 text-[#071526]/40" />}
+                {active && !isCollapsed && <ChevronRight className="w-3.5 h-3.5 text-[#071526]/40" />}
               </div>
             </Link>
           );
@@ -167,32 +173,35 @@ export default function Sidebar() {
             <div>
               <button
                 type="button"
+                title={isCollapsed ? "User Management" : undefined}
                 onClick={(e) => { e.preventDefault(); setUserMenuOpen((o) => !o); }}
                 className={navRow(userSectionActive) + ' w-full'}
               >
                 {userSectionActive && (
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-r-full bg-[#071526]" />
                 )}
-                <div className="flex items-center gap-3">
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                   <div className={iconBox(userSectionActive)}>
                     <Users className={iconColor(userSectionActive)} />
                   </div>
-                  <span className="text-sm font-semibold">User Management</span>
+                  {!isCollapsed && <span className="text-sm font-semibold">User Management</span>}
                 </div>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${userMenuOpen ? 'rotate-180 text-[#071526]' : 'text-gray-500'}`} />
+                {!isCollapsed && (
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${userMenuOpen ? 'rotate-180 text-[#071526]' : 'text-gray-500'}`} />
+                )}
               </button>
 
               <div className={`overflow-hidden transition-all duration-300 ease-in-out ${userMenuOpen ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
-                <div className="ml-[22px] mt-1 mb-1 border-l-2 border-[#071526]/15 pl-3.5 space-y-0.5">
+                <div className={`${isCollapsed ? 'pl-0 border-none' : 'ml-[22px] border-l-2 border-[#071526]/15 pl-3.5'} mt-1 mb-1 space-y-0.5`}>
                   {userSubItems.map(({ label, path, icon: Icon }) => {
                     const active = pathname.startsWith(path);
                     return (
-                      <Link key={path} href={path} onClick={closeSidebar}>
-                        <div className={`group flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer ${active ? 'bg-[#071526]/8 text-[#071526]' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-950'
+                      <Link key={path} href={path} onClick={closeSidebar} title={isCollapsed ? label : undefined}>
+                        <div className={`group flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-2.5 px-3'} py-2 rounded-lg transition-all duration-150 cursor-pointer ${active ? 'bg-[#071526]/8 text-[#071526]' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-950'
                           }`}>
                           <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-[#071526]' : 'text-gray-600 group-hover:text-gray-900'}`} />
-                          <span className={`text-[13px] font-semibold ${active ? 'text-[#071526]' : ''}`}>{label}</span>
-                          {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#071526]" />}
+                          {!isCollapsed && <span className={`text-[13px] font-semibold ${active ? 'text-[#071526]' : ''}`}>{label}</span>}
+                          {active && !isCollapsed && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#071526]" />}
                         </div>
                       </Link>
                     );
@@ -210,32 +219,35 @@ export default function Sidebar() {
             <div>
               <button
                 type="button"
+                title={isCollapsed ? "Finance" : undefined}
                 onClick={(e) => { e.preventDefault(); setFinanceMenuOpen((o) => !o); }}
                 className={navRow(financeSectionActive) + ' w-full'}
               >
                 {financeSectionActive && (
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-r-full bg-[#071526]" />
                 )}
-                <div className="flex items-center gap-3">
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                   <div className={iconBox(financeSectionActive)}>
                     <IndianRupee className={iconColor(financeSectionActive)} />
                   </div>
-                  <span className="text-sm font-semibold">Finance</span>
+                  {!isCollapsed && <span className="text-sm font-semibold">Finance</span>}
                 </div>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${financeMenuOpen ? 'rotate-180 text-[#071526]' : 'text-gray-500'}`} />
+                {!isCollapsed && (
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${financeMenuOpen ? 'rotate-180 text-[#071526]' : 'text-gray-500'}`} />
+                )}
               </button>
               <div className={`overflow-hidden transition-all duration-300 ease-in-out ${financeMenuOpen ? 'max-h-72 opacity-100' : 'max-h-0 opacity-0'}`}>
-                <div className="ml-[22px] mt-1 mb-1 border-l-2 border-[#071526]/15 pl-3.5 space-y-0.5">
+                <div className={`${isCollapsed ? 'pl-0 border-none' : 'ml-[22px] border-l-2 border-[#071526]/15 pl-3.5'} mt-1 mb-1 space-y-0.5`}>
                   {financeSubItems.map(({ label, path, icon: Icon }) => {
                     const active = path === '/platform-owner/finance'
                       ? pathname === '/platform-owner/finance'
                       : pathname.startsWith(path);
                     return (
-                      <Link key={path} href={path} onClick={closeSidebar}>
-                        <div className={`group flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer ${active ? 'bg-[#071526]/8 text-[#071526]' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-950'}`}>
+                      <Link key={path} href={path} onClick={closeSidebar} title={isCollapsed ? label : undefined}>
+                        <div className={`group flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-2.5 px-3'} py-2 rounded-lg transition-all duration-150 cursor-pointer ${active ? 'bg-[#071526]/8 text-[#071526]' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-950'}`}>
                           <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-[#071526]' : 'text-gray-600 group-hover:text-gray-900'}`} />
-                          <span className={`text-[13px] font-semibold ${active ? 'text-[#071526]' : ''}`}>{label}</span>
-                          {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#071526]" />}
+                          {!isCollapsed && <span className={`text-[13px] font-semibold ${active ? 'text-[#071526]' : ''}`}>{label}</span>}
+                          {active && !isCollapsed && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#071526]" />}
                         </div>
                       </Link>
                     );
@@ -249,23 +261,25 @@ export default function Sidebar() {
         {(isActive('/platform-owner/profile') || isActive('/platform-owner/settings')) && (
           <>
             <div className="my-3 border-t border-gray-100" />
-            <div className="px-3 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-800">Account Context</span>
-            </div>
+            {!isCollapsed && (
+              <div className="px-3 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-800">Account Context</span>
+              </div>
+            )}
             {[
               { label: 'Profile', path: '/platform-owner/profile', icon: UserCheck },
               { label: 'Settings', path: '/platform-owner/settings', icon: Settings }
             ].map(({ label, path, icon: Icon }) => {
               const active = isActive(path);
               return (
-                <Link key={path} href={path} onClick={closeSidebar}>
+                <Link key={path} href={path} onClick={closeSidebar} title={isCollapsed ? label : undefined}>
                   <div className={navRow(active)}>
                     {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-r-full bg-[#071526]" />}
-                    <div className="flex items-center gap-3">
+                    <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                       <div className={iconBox(active)}><Icon className={iconColor(active)} /></div>
-                      <span className="text-sm font-semibold">{label}</span>
+                      {!isCollapsed && <span className="text-sm font-semibold">{label}</span>}
                     </div>
-                    {active && <ChevronRight className="w-3.5 h-3.5 text-[#071526]/40" />}
+                    {active && !isCollapsed && <ChevronRight className="w-3.5 h-3.5 text-[#071526]/40" />}
                   </div>
                 </Link>
               );
@@ -275,10 +289,10 @@ export default function Sidebar() {
       </nav>
 
       {/* Bottom user card */}
-      <div className="border-t border-gray-100 px-4 py-3">
-        <button onClick={handleLogout} className="flex items-center gap-2 text-[#071526] hover:opacity-75 transition-opacity">
-          <LogOut className="w-4 h-4" />
-          <span className="text-[15px] font-semibold">Log Out</span>
+      <div className="border-t border-gray-100 px-3 py-3 flex justify-center">
+        <button onClick={handleLogout} title={isCollapsed ? "Log Out" : undefined} className={`flex items-center ${isCollapsed ? 'justify-center w-full' : 'gap-2 px-2'} text-[#071526] hover:opacity-75 transition-opacity`}>
+          <LogOut className="w-4 h-4 shrink-0" />
+          {!isCollapsed && <span className="text-[15px] font-semibold">Log Out</span>}
         </button>
       </div>
     </aside>
@@ -286,7 +300,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <div className="hidden lg:flex w-64 h-screen shrink-0 sticky top-0">
+      <div className={`hidden lg:flex ${isCollapsed ? 'w-20' : 'w-64'} h-screen shrink-0 sticky top-0 transition-all duration-300`}>
         {sidebarContent}
       </div>
 

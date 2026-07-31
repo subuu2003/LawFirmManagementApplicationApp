@@ -356,7 +356,7 @@ export function ComingSoonMask({ title = "Coming Soon", message = "This feature 
           <div className="h-8 w-48 bg-gray-200 rounded-lg animate-pulse" />
           <div className="h-10 w-32 bg-gray-200 rounded-lg animate-pulse" />
         </div>
-        <div className="grid grid-cols-4 gap-6 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-gray-100 rounded-2xl animate-pulse" />)}
         </div>
         <div className="space-y-4">

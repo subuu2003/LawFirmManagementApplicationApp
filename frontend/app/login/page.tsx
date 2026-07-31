@@ -5,17 +5,16 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  User, // Added User icon
+  User,
   Lock,
   Scale,
   AlertCircle,
-  Star,
   Phone,
-  ArrowRight, // Added ArrowRight
+  ArrowRight,
   Fingerprint,
   ShieldCheck,
-  Clock, // Added Clock
-  UserCheck // Added UserCheck for data protection
+  Clock,
+  UserCheck
 } from 'lucide-react';
 
 import { customFetch } from '@/lib/fetch';
@@ -153,17 +152,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="h-screen w-full overflow-hidden flex bg-white font-['DM_Sans',sans-serif]">
+    <div className="h-screen w-full flex bg-white font-['DM_Sans',sans-serif] overflow-hidden">
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap');
         .font-serif { font-family: 'DM Serif Display', serif; }
       `}</style>
 
-      {/* LEFT SIDE: Brand & Testimonial */}
+      {/* LEFT SIDE: Brand & Showcase */}
       <div
-        className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-12 xl:p-16 text-white overflow-hidden"
+        className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-6 xl:p-10 2xl:p-12 text-white h-full overflow-hidden"
         style={{
-          /* Adjusted gradient to let the pillars show through exactly like Image 2 */
           background: "url('/courtlogin.png')",
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -173,14 +171,14 @@ export default function LoginPage() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative z-10"
+          className="relative z-10 shrink-0"
         >
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 bg-[#c9a96e] rounded-lg flex items-center justify-center shadow-lg transition-transform group-hover:scale-105">
-              <Scale className="w-5 h-5 text-[#0e2340]" />
+            <div className="w-9 h-9 bg-[#c9a96e] rounded-lg flex items-center justify-center shadow-lg transition-transform group-hover:scale-105">
+              <Scale className="w-4.5 h-4.5 text-[#0e2340]" />
             </div>
             <div>
-              <span className="font-bold text-2xl tracking-tight block text-white">
+              <span className="font-bold text-xl xl:text-2xl tracking-tight block text-white">
                 Ant<span className="text-[#c9a96e]">Legal</span>
               </span>
             </div>
@@ -188,15 +186,15 @@ export default function LoginPage() {
         </motion.div>
 
         {/* Content Area */}
-        <div className="relative z-10 mt-12 flex-1 flex flex-col justify-center">
+        <div className="relative z-10 my-auto flex flex-col justify-center">
           {/* Gold Bar Line above heading */}
-          <div className="w-10 h-[2px] bg-[#c9a96e] mb-8" />
+          <div className="w-8 h-[2px] bg-[#c9a96e] mb-4" />
 
           <motion.h1
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
-            className="font-serif text-[64px] xl:text-[72px] leading-[1.05] tracking-tight mb-6"
+            className="font-serif text-3xl xl:text-4xl 2xl:text-5xl leading-[1.1] tracking-tight mb-4"
           >
             Empowering the <br />
             <span className="italic text-[#c9a96e]">Modern</span> Advocate
@@ -205,100 +203,65 @@ export default function LoginPage() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 }}
-            className="text-[17px] text-white/80 max-w-md leading-relaxed"
+            className="text-sm xl:text-base text-white/80 max-w-sm leading-relaxed"
           >
             The comprehensive operating system designed specifically for high-performance law firms.
           </motion.p>
-
-          {/* Testimonial Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="mt-14 max-w-[440px]"
-          >
-            <div className="bg-[#12243d]/80 backdrop-blur-md border border-white/5 p-8 rounded-[24px] relative group">
-              <div className="flex gap-4 items-center mb-4">
-                <span className="text-[54px] font-serif text-[#c9a96e] leading-[0] mt-6">“</span>
-                <div className="flex gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 text-[#c9a96e] fill-[#c9a96e]" />
-                  ))}
-                </div>
-              </div>
-
-              <blockquote className="text-base font-light leading-relaxed mb-8 italic text-white/90">
-                AntLegal has completely transformed how we manage our case lifecycle. The efficiency gains are remarkable.
-              </blockquote>
-
-              <div className="border-t border-white/10 pt-6 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-full border border-[#c9a96e] overflow-hidden bg-transparent flex items-center justify-center font-semibold text-sm text-[#c9a96e]">
-                  RS
-                </div>
-                <div>
-                  <p className="font-semibold text-[15px]">Ritik Saxena</p>
-                  <p className="text-[13px] text-white/60">
-                    CEO, Saxena & Associates
-                  </p>
-                </div>
-              </div>
-            </div>
-          </motion.div>
         </div>
 
-        {/* Bottom Stats (3 columns) */}
-        <div className="relative z-10 flex items-center gap-8 xl:gap-12 mt-12 pt-8">
-          <div className="flex items-center gap-3">
-            <ShieldCheck className="w-6 h-6 text-[#c9a96e]" strokeWidth={1.5} />
+        {/* Bottom Stats */}
+        <div className="relative z-10 flex flex-wrap items-center gap-4 xl:gap-8 pt-4 border-t border-white/10 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-[#c9a96e] shrink-0" strokeWidth={1.5} />
             <div>
-              <p className="text-[13px] font-semibold text-white">Secure Access</p>
-              <p className="text-[12px] text-white/60">256-bit encryption</p>
+              <p className="text-xs font-semibold text-white">Secure Access</p>
+              <p className="text-[11px] text-white/60">256-bit encryption</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Clock className="w-6 h-6 text-[#c9a96e]" strokeWidth={1.5} />
+          <div className="flex items-center gap-2.5">
+            <Clock className="w-4 h-4 text-[#c9a96e] shrink-0" strokeWidth={1.5} />
             <div>
-              <p className="text-[13px] font-semibold text-white">Always Available</p>
-              <p className="text-[12px] text-white/60">99.9% uptime</p>
+              <p className="text-xs font-semibold text-white">Always Available</p>
+              <p className="text-[11px] text-white/60">99.9% uptime</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <UserCheck className="w-6 h-6 text-[#c9a96e]" strokeWidth={1.5} />
+          <div className="flex items-center gap-2.5">
+            <UserCheck className="w-4 h-4 text-[#c9a96e] shrink-0" strokeWidth={1.5} />
             <div>
-              <p className="text-[13px] font-semibold text-white">Your Data, Protected</p>
-              <p className="text-[12px] text-white/60">Industry-standard security</p>
+              <p className="text-xs font-semibold text-white">Data Protected</p>
+              <p className="text-[11px] text-white/60">Industry standards</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* RIGHT SIDE: Login Form Container */}
-      <div className="w-full lg:w-1/2 bg-[#f8f9fa] flex flex-col items-center justify-center relative p-6 overflow-y-auto h-full py-12 lg:py-6">
+      <div className="w-full lg:w-1/2 bg-[#f8f9fa] flex flex-col items-center justify-between relative p-4 sm:p-6 h-full overflow-hidden">
 
-        {/* Curved background pattern (simulated with radial gradient for clean look) */}
-        <div className="absolute inset-0 opacity-[0.4]"
+        {/* Background ambient accents */}
+        <div className="absolute inset-0 opacity-[0.4] pointer-events-none"
           style={{ background: 'radial-gradient(circle at top right, #f2ece1 0%, transparent 40%)' }}></div>
-        <div className="absolute inset-0 opacity-[0.4]"
+        <div className="absolute inset-0 opacity-[0.4] pointer-events-none"
           style={{ background: 'radial-gradient(circle at bottom left, #f2ece1 0%, transparent 40%)' }}></div>
 
         {/* FLOATING CARD */}
-        <div className="relative z-10 w-full max-w-[620px] bg-white rounded-[28px] p-8 md:p-12 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100">
+        <div className="relative z-10 w-full max-w-[480px] xl:max-w-[520px] bg-white rounded-[20px] sm:rounded-[24px] p-5 sm:p-6 xl:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 my-auto shrink max-h-[calc(100vh-48px)] overflow-y-auto">
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.5 }}
             className="w-full"
           >
             {/* Header section with icon */}
-            <div className="flex flex-col items-center text-center mb-8">
-              <div className="w-12 h-12 bg-[#faf7f2] border border-[#f2e8d5] rounded-full flex items-center justify-center mb-5">
-                <ShieldCheck className="w-8 h-8 text-[#c9a96e]" strokeWidth={2} />
+            <div className="flex flex-col items-center text-center mb-4 sm:mb-5">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#faf7f2] border border-[#f2e8d5] rounded-full flex items-center justify-center mb-2.5">
+                <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-[#c9a96e]" strokeWidth={2} />
               </div>
-              <h2 className="font-serif text-[38px] text-[#0e2340] mb-0">
+              <h2 className="font-serif text-xl sm:text-2xl xl:text-[28px] text-[#0e2340] mb-0.5">
                 Welcome back
               </h2>
-              <p className="text-[17px] text-gray-800">Sign in to access your AntLegal portal</p>
+              <p className="text-xs sm:text-sm text-gray-600">Sign in to access your AntLegal portal</p>
             </div>
 
             <AnimatePresence mode="wait">
@@ -307,27 +270,27 @@ export default function LoginPage() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="bg-red-50 border border-red-100 rounded-xl p-4 mb-6 flex items-center gap-3 text-red-700"
+                  className="bg-red-50 border border-red-100 rounded-xl p-3 mb-4 flex items-center gap-2.5 text-red-700"
                 >
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                  <div className="text-sm font-medium">{error}</div>
+                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <div className="text-xs font-medium">{error}</div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <form className="space-y-5" onSubmit={handleSubmit}>
+            <form className="space-y-3 sm:space-y-4" onSubmit={handleSubmit}>
 
               {/* Email / Username Input */}
-              <div className="space-y-1.5">
-                <label htmlFor="email" className="block text-[14px] font-semibold text-[#0e2340]">
+              <div className="space-y-1">
+                <label htmlFor="email" className="block text-xs font-semibold text-[#0e2340]">
                   {loginMode === 'password' ? 'Email or Username' : 'Email or Phone'}
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                     {isEmailInput ? (
-                      <User className={`w-5 h-5 transition-colors duration-300 ${focusedField === 'email' ? 'text-[#c9a96e]' : 'text-gray-400'}`} strokeWidth={1.5} />
+                      <User className={`w-4 h-4 transition-colors duration-300 ${focusedField === 'email' ? 'text-[#c9a96e]' : 'text-gray-400'}`} strokeWidth={1.5} />
                     ) : (
-                      <Phone className={`w-5 h-5 transition-colors duration-300 ${focusedField === 'email' ? 'text-[#c9a96e]' : 'text-gray-400'}`} strokeWidth={1.5} />
+                      <Phone className={`w-4 h-4 transition-colors duration-300 ${focusedField === 'email' ? 'text-[#c9a96e]' : 'text-gray-400'}`} strokeWidth={1.5} />
                     )}
                   </div>
                   <input
@@ -341,7 +304,7 @@ export default function LoginPage() {
                     onChange={handleInputChange}
                     onFocus={() => setFocusedField('email')}
                     onBlur={() => setFocusedField(null)}
-                    className={`block w-full pl-12 pr-4 h-[52px] bg-white border rounded-xl text-[#0e2340] font-medium placeholder-gray-400 transition-all focus:outline-none focus:ring-1 focus:ring-[#0e2340] ${focusedField === 'email' ? 'border-[#0e2340]' : 'border-gray-200'} ${otpSent && loginMode === 'code' ? 'opacity-50 bg-gray-50' : ''}`}
+                    className={`block w-full pl-10 pr-3.5 h-[42px] sm:h-[46px] bg-white border rounded-xl text-[#0e2340] font-medium text-xs sm:text-sm placeholder-gray-400 transition-all focus:outline-none focus:ring-1 focus:ring-[#0e2340] ${focusedField === 'email' ? 'border-[#0e2340]' : 'border-gray-200'} ${otpSent && loginMode === 'code' ? 'opacity-50 bg-gray-50' : ''}`}
                     placeholder="name@lawfirm.com"
                   />
                 </div>
@@ -355,16 +318,16 @@ export default function LoginPage() {
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-1.5"
+                    transition={{ duration: 0.2 }}
+                    className="space-y-1"
                   >
                     <div className="flex items-center justify-between">
-                      <label htmlFor="password" className="block text-[14px] font-semibold text-[#0e2340]">
+                      <label htmlFor="password" className="block text-xs font-semibold text-[#0e2340]">
                         Password
                       </label>
                       <Link
                         href="/forgot-password"
-                        className="text-[13px] font-medium text-[#c9a96e] hover:text-[#0e2340] transition-colors"
+                        className="text-[11px] sm:text-xs font-medium text-[#c9a96e] hover:text-[#0e2340] transition-colors"
                       >
                         Forgot password?
                       </Link>
@@ -375,10 +338,10 @@ export default function LoginPage() {
                         onChange={v => setFormData(p => ({ ...p, password: v }))}
                         required={loginMode === 'password'}
                         autoComplete="current-password"
-                        className="!pl-12 !h-[52px] !bg-white !border !border-gray-200 !rounded-xl focus:!border-[#0e2340] focus:!ring-1 focus:!ring-[#0e2340] transition-all !font-medium"
+                        className="!pl-10 !h-[42px] sm:!h-[46px] !bg-white !border !border-gray-200 !rounded-xl focus:!border-[#0e2340] focus:!ring-1 focus:!ring-[#0e2340] transition-all !font-medium text-xs sm:text-sm"
                       />
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Lock className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <Lock className="w-4 h-4 text-gray-400" strokeWidth={1.5} />
                       </div>
                     </div>
                   </motion.div>
@@ -388,16 +351,16 @@ export default function LoginPage() {
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
-                    className="space-y-1.5"
+                    className="space-y-1"
                   >
                     <div className="flex items-center justify-between">
-                      <label htmlFor="otp" className="block text-[14px] font-semibold text-[#0e2340]">
+                      <label htmlFor="otp" className="block text-xs font-semibold text-[#0e2340]">
                         Verification Code
                       </label>
                       <button
                         type="button"
                         onClick={() => { setOtpSent(false); setOtpValue(''); setError(''); }}
-                        className="text-[13px] font-medium text-[#c9a96e] hover:text-[#0e2340] transition-colors"
+                        className="text-[11px] sm:text-xs font-medium text-[#c9a96e] hover:text-[#0e2340] transition-colors"
                       >
                         Change Account
                       </button>
@@ -409,7 +372,7 @@ export default function LoginPage() {
                       required
                       value={otpValue}
                       onChange={(e) => { setOtpValue(e.target.value); setError(''); }}
-                      className="block w-full px-4 h-[52px] bg-white border border-gray-200 rounded-xl text-center tracking-[0.5em] text-xl font-bold text-[#0e2340] placeholder-gray-300 focus:outline-none focus:border-[#0e2340] focus:ring-1 focus:ring-[#0e2340] transition-all uppercase"
+                      className="block w-full px-3.5 h-[42px] sm:h-[46px] bg-white border border-gray-200 rounded-xl text-center tracking-[0.4em] text-base sm:text-lg font-bold text-[#0e2340] placeholder-gray-300 focus:outline-none focus:border-[#0e2340] focus:ring-1 focus:ring-[#0e2340] transition-all uppercase"
                       placeholder="••••••"
                       maxLength={6}
                     />
@@ -419,70 +382,70 @@ export default function LoginPage() {
 
               {/* Main Submit Button */}
               <motion.button
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
+                whileHover={{ scale: 1.005 }}
+                whileTap={{ scale: 0.995 }}
                 type="submit"
                 disabled={loading}
-                className="w-full mt-2 h-[52px] bg-[#0A1629] text-white rounded-xl font-semibold text-[15px] transition-all hover:bg-[#122543] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center px-6 relative"
+                className="w-full mt-1 h-[42px] sm:h-[46px] bg-[#0A1629] text-white rounded-xl font-semibold text-xs sm:text-sm transition-all hover:bg-[#122543] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center px-5 relative"
               >
                 {loading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
                     <span>
                       {loginMode === 'password' ? 'Sign In to Portal' :
                         otpSent ? 'Verify Code' : 'Send Code'}
                     </span>
-                    <ArrowRight className="w-5 h-5 absolute right-6" />
+                    <ArrowRight className="w-4 h-4 absolute right-4 sm:right-5" />
                   </>
                 )}
               </motion.button>
             </form>
 
             {/* Divider */}
-            <div className="relative flex items-center py-6">
+            <div className="relative flex items-center py-3.5 sm:py-4">
               <div className="flex-grow border-t border-gray-200"></div>
-              <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-semibold uppercase">OR</span>
+              <span className="flex-shrink-0 mx-3 text-gray-400 text-[10px] sm:text-xs font-semibold uppercase">OR</span>
               <div className="flex-grow border-t border-gray-200"></div>
             </div>
 
             {/* OTP / Password Toggle Button */}
             <button
               type="button"
-              className="w-full h-[52px] bg-white border border-gray-200 rounded-xl text-[14px] font-semibold text-[#0e2340] transition-all hover:bg-gray-50 flex items-center justify-center gap-2 mb-6"
+              className="w-full h-[40px] sm:h-[44px] bg-white border border-gray-200 rounded-xl text-xs sm:text-sm font-semibold text-[#0e2340] transition-all hover:bg-gray-50 flex items-center justify-center gap-2 mb-3.5 sm:mb-4"
               onClick={() => { setLoginMode(loginMode === 'password' ? 'code' : 'password'); setOtpSent(false); setOtpValue(''); setError(''); }}
             >
               {loginMode === 'password' ? (
-                <><Fingerprint className="w-5 h-5 text-[#c9a96e]" /> Sign in with OTP</>
+                <><Fingerprint className="w-4 h-4 text-[#c9a96e]" /> Sign in with OTP</>
               ) : (
-                <><Lock className="w-5 h-5 text-[#c9a96e]" /> Sign in with Password</>
+                <><Lock className="w-4 h-4 text-[#c9a96e]" /> Sign in with Password</>
               )}
             </button>
 
             {/* Remember Me & Create Account Row */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <div className="flex items-center gap-2">
                 <input
                   id="remember-me"
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-[#0e2340] border-gray-300 rounded focus:ring-[#0e2340] cursor-pointer"
+                  className="w-3.5 h-3.5 text-[#0e2340] border-gray-300 rounded focus:ring-[#0e2340] cursor-pointer"
                 />
-                <label htmlFor="remember-me" className="text-[14px] text-gray-600 font-medium cursor-pointer">
+                <label htmlFor="remember-me" className="text-xs text-gray-600 font-medium cursor-pointer">
                   Remember me
                 </label>
               </div>
-              <p className="text-[14px] font-medium text-gray-500">
+              <p className="text-xs font-medium text-gray-500">
                 New here? {' '}
                 <Link href="/register" className="text-[#c9a96e] hover:text-[#0e2340] font-semibold transition-colors">Create Account</Link>
               </p>
             </div>
 
             {/* Trust Badge */}
-            <div className="bg-[#f8f9fa] rounded-xl p-4 flex gap-3 items-start border border-gray-100">
-              <ShieldCheck className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" strokeWidth={1.5} />
-              <p className="text-[12px] text-gray-500 leading-relaxed">
+            <div className="bg-[#f8f9fa] rounded-xl p-3 flex gap-2.5 items-start border border-gray-100">
+              <ShieldCheck className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" strokeWidth={1.5} />
+              <p className="text-[11px] sm:text-xs text-gray-500 leading-relaxed">
                 Protected by industry-standard encryption.<br />
                 By signing in, you agree to our <Link href="/terms" className="text-[#c9a96e] hover:underline">Terms</Link> and <Link href="/privacy" className="text-[#c9a96e] hover:underline">Privacy Policy</Link>.
               </p>
@@ -492,7 +455,7 @@ export default function LoginPage() {
         </div> {/* END FLOATING CARD */}
 
         {/* Copyright Text at Bottom */}
-        <div className="absolute bottom-8 text-[13px] font-medium text-gray-500">
+        <div className="text-[11px] sm:text-xs font-medium text-gray-500 py-1 text-center shrink-0">
           © 2026 AntLegal. All rights reserved.
         </div>
       </div>

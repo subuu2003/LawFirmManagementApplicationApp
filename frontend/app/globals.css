@@ -5,6 +5,30 @@
   --foreground: #171717;
 }
 
+/* Precise Zoom Normalization:
+   Mathematically scales root rem base so 150% browser zoom renders 
+   visually identical to 100% zoom (16px effective base size). */
+html {
+  font-size: 81.25%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* 125% zoom scale adjustment */
+@media (min-resolution: 1.2dppx) {
+  html {
+    font-size: 75%;
+  }
+}
+
+/* 150% browser zoom scale adjustment:
+   66.667% * 1.5 = 100% (16px base), making 150% zoom look like 100% zoom */
+@media (min-resolution: 1.4dppx) {
+  html {
+    font-size: 66.667%;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

@@ -12,6 +12,7 @@ import { useTopbar } from '@/components/platform/TopbarContext';
 
 const pageTitles = [
   { match: '/paralegal/dashboard', title: 'Paralegal Dashboard', sub: 'Support case prep and draft petition reviews.' },
+  { match: '/paralegal/cases/new', title: 'Create New Case', sub: 'Register a new matter and assign it to your team' },
   { match: '/paralegal/cases', title: 'Assigned Cases', sub: 'Track filings, hearing tasks, and document readiness.' },
   { match: '/paralegal/drafting', title: 'Drafting Assist', sub: 'Prepare support drafts for advocate review.' },
   { match: '/paralegal/calendar', title: 'Schedules', sub: 'Manage case schedules, hearings, and prep reminders.' },
@@ -19,7 +20,7 @@ const pageTitles = [
 
 export default function ParalegalTopbar() {
   const router = useRouter();
-  const { toggleSidebar } = useTopbar();
+  const { toggleSidebar, dynamic } = useTopbar();
 
   const handleLogout = async () => {
     try {
@@ -35,7 +36,8 @@ export default function ParalegalTopbar() {
   };
 
   const pathname = usePathname();
-  const page = resolveRouteMeta(pathname, pageTitles, { title: 'Paralegal Dashboard', sub: 'Support case prep and draft petition reviews.' });
+  const routePage = resolveRouteMeta(pathname, pageTitles, { title: 'Paralegal Dashboard', sub: 'Support case prep and draft petition reviews.' });
+  const page = dynamic ?? routePage;
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 

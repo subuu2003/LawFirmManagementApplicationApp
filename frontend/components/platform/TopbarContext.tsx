@@ -14,6 +14,9 @@ interface TopbarContextValue {
   isSidebarOpen: boolean;
   toggleSidebar: () => void;
   closeSidebar: () => void;
+  isCollapsed: boolean;
+  toggleCollapse: () => void;
+  setIsCollapsed: (collapsed: boolean) => void;
 }
 
 const TopbarContext = createContext<TopbarContextValue>({
@@ -22,11 +25,29 @@ const TopbarContext = createContext<TopbarContextValue>({
   isSidebarOpen: false,
   toggleSidebar: () => {},
   closeSidebar: () => {},
+  isCollapsed: false,
+  toggleCollapse: () => {},
+  setIsCollapsed: () => {},
 });
 
 export function TopbarProvider({ children }: { children: ReactNode }) {
   const [dynamic, setDynamicState] = useState<TopbarMeta | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsedState] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('sidebar_collapsed');
+      if (saved !== null) {
+        setIsCollapsedState(saved === 'true');
+      } else {
+        // Auto-squeezed mode on tablet viewports (768px <= width < 1024px) for optimal workspace responsiveness
+        if (typeof window !== 'undefined' && window.innerWidth >= 768 && window.innerWidth < 1024) {
+          setIsCollapsedState(true);
+        }
+      }
+    } catch { }
+  }, []);
 
   const setDynamic = useCallback((meta: TopbarMeta | null) => {
     setDynamicState(meta);
@@ -40,14 +61,40 @@ export function TopbarProvider({ children }: { children: ReactNode }) {
     setIsSidebarOpen(false);
   }, []);
 
-  // Close sidebar on route change
+  const toggleCollapse = useCallback(() => {
+    setIsCollapsedState((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('sidebar_collapsed', String(next));
+      } catch { }
+      return next;
+    });
+  }, []);
+
+  const setIsCollapsed = useCallback((collapsed: boolean) => {
+    setIsCollapsedState(collapsed);
+    try {
+      localStorage.setItem('sidebar_collapsed', String(collapsed));
+    } catch { }
+  }, []);
+
+  // Close mobile sidebar on route change
   const pathname = usePathname();
   useEffect(() => {
     setIsSidebarOpen(false);
   }, [pathname]);
 
   return (
-    <TopbarContext.Provider value={{ dynamic, setDynamic, isSidebarOpen, toggleSidebar, closeSidebar }}>
+    <TopbarContext.Provider value={{
+      dynamic,
+      setDynamic,
+      isSidebarOpen,
+      toggleSidebar,
+      closeSidebar,
+      isCollapsed,
+      toggleCollapse,
+      setIsCollapsed
+    }}>
       {children}
     </TopbarContext.Provider>
   );

@@ -22,6 +22,8 @@ import {
   X,
   Loader2,
   ChevronLeft,
+  ChevronRight,
+  Search,
   ExternalLink,
   Download,
   PlusCircle,
@@ -30,7 +32,6 @@ import {
   ChevronDown,
   AlertCircle,
   Eye,
-  Search,
 } from 'lucide-react';
 import {
   ActivityFeed,
@@ -133,7 +134,7 @@ function DataTable({
 }) {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 5;
+  const pageSize = 10;
 
   const filteredRows = useMemo(
     () =>
@@ -150,69 +151,149 @@ function DataTable({
   const pagedRows = filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
-    <div className="space-y-4">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col w-full">
+      {/* Top Filter & Inline Pagination Control Bar */}
+      <div className="p-4 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3 bg-slate-50/50">
+        {/* Search input */}
+        <div className="relative w-full sm:w-64">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search records..."
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 font-medium focus:outline-none focus:border-blue-500 shadow-sm placeholder:text-slate-400"
+          />
+        </div>
 
+        {/* Inline Pagination & Counter */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1">
+            <button
+              disabled={safePage === 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 transition-all bg-white shadow-sm"
+            >
+              <ChevronLeft className="w-4 h-4 text-slate-600" />
+            </button>
+            <span className="px-2 text-xs font-bold text-slate-600">
+              Page {safePage} of {pageCount}
+            </span>
+            <button
+              disabled={safePage >= pageCount}
+              onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+              className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 transition-all bg-white shadow-sm"
+            >
+              <ChevronRight className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
+
+          <span className="text-xs font-semibold text-slate-400">
+            {filteredRows.length} total
+          </span>
+        </div>
+      </div>
+
+      {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[920px] text-left">
-          <thead>
-            <tr className="border-b border-gray-100 bg-[#f7f8fa]">
-              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400">Sl. No</th>
+        <table className="w-full text-left border-collapse min-w-[850px]">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">SL. NO</th>
               {columns.map((column) => (
-                <th key={column.key} className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400">
+                <th key={column.key} className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">
                   {column.label}
                 </th>
               ))}
-              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400">View</th>
+              <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">ACTION</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
-            {pagedRows.map((row, index) => (
-              <tr key={`${row[columns[0].key]}-${index}`}>
-                <td className="px-4 py-4 text-sm font-semibold text-gray-700">{(safePage - 1) * pageSize + index + 1}</td>
-                {columns.map((column) => (
-                  <td key={column.key} className="px-4 py-4 text-sm text-gray-600">
-                    {row[column.key]}
-                  </td>
-                ))}
-                <td className="px-4 py-4">
-                  {row.viewHref ? (
-                    <Link href={row.viewHref} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-[#0e2340] hover:bg-gray-50">
-                      View
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
-                  ) : (
-                    <button className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-[#0e2340] hover:bg-gray-50">
-                      View
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+          <tbody className="divide-y divide-slate-100">
+            {pagedRows.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length + 2} className="py-12 text-center text-slate-400 font-semibold text-sm">
+                  {query ? 'No records match your search' : 'No records found'}
                 </td>
               </tr>
-            ))}
+            ) : (
+              pagedRows.map((row, index) => (
+                <tr key={`${row[columns[0].key]}-${index}`} className="hover:bg-slate-50/80 transition-colors group cursor-pointer">
+                  <td className="py-4 px-6 text-sm font-semibold text-slate-500">
+                    {(safePage - 1) * pageSize + index + 1}
+                  </td>
+                  {columns.map((column) => {
+                    const val = row[column.key];
+
+                    // Status Column -> Clean badge
+                    if (column.key === 'status' && typeof val === 'string') {
+                      const statusLower = val.toLowerCase();
+                      let badgeStyle = 'bg-slate-100 text-slate-700 border-slate-200';
+                      if (['open', 'active', 'paid', 'approved', 'running'].includes(statusLower)) {
+                        badgeStyle = 'bg-emerald-50 text-emerald-700 border-emerald-200/60';
+                      } else if (['pending', 'in_progress', 'draft', 'overdue', 'unpaid'].includes(statusLower)) {
+                        badgeStyle = 'bg-amber-50 text-amber-700 border-amber-200/60';
+                      } else if (['closed', 'disposed off', 'disposed'].includes(statusLower)) {
+                        badgeStyle = 'bg-slate-100 text-slate-600 border-slate-200';
+                      }
+                      return (
+                        <td key={column.key} className="py-4 px-6 text-sm">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border uppercase tracking-wider ${badgeStyle}`}>
+                            {val}
+                          </span>
+                        </td>
+                      );
+                    }
+
+                    // Main title/matter -> bold text with hover accent
+                    if (['matter', 'title', 'firm', 'client', 'name'].includes(column.key)) {
+                      return (
+                        <td key={column.key} className="py-4 px-6 text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                          {val}
+                        </td>
+                      );
+                    }
+
+                    // Code / Number column -> mono badge
+                    if (['number', 'code', 'invoice', 'id'].includes(column.key)) {
+                      return (
+                        <td key={column.key} className="py-4 px-6 text-sm">
+                          <span className="font-mono font-bold text-blue-600 bg-blue-50/60 border border-blue-100 px-2.5 py-1 rounded-lg text-xs">
+                            {val}
+                          </span>
+                        </td>
+                      );
+                    }
+
+                    return (
+                      <td key={column.key} className="py-4 px-6 text-sm text-slate-600 font-medium">
+                        {val}
+                      </td>
+                    );
+                  })}
+                  <td className="py-4 px-6 text-right">
+                    {row.viewHref ? (
+                      <Link
+                        href={row.viewHref}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all"
+                      >
+                        View
+                        <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
+                      </Link>
+                    ) : (
+                      <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all">
+                        View
+                        <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
-      </div>
-      <div className="flex items-center justify-between border-t border-gray-100 pt-3">
-        <p className="text-xs text-gray-400">
-          Showing {pagedRows.length} of {filteredRows.length} entries
-        </p>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-          >
-            Prev
-          </button>
-          <span className="text-xs font-semibold text-gray-500">
-            {safePage} / {pageCount}
-          </span>
-          <button
-            onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-          >
-            Next
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -586,57 +667,53 @@ export function CasesPage({
     fetchCases();
   }, [filterByAssignedAdvocate]);
 
-  const caseRows = cases.map((c) => ({
-    matter: c.case_title || 'Untitled Case',
-    number: c.case_number || 'N/A',
-    acts: c.acts_sections || 'N/A',
-    status: c.status || 'N/A',
-    advocate: c.assigned_advocate_name || 'Unassigned',
-    hearing: c.next_hearing_date || 'Not scheduled',
-    viewHref: viewBase ? `${viewBase}/${c.id}` : undefined,
-  }));
+  const caseRows = cases.map((c) => {
+    const locationParts = [c.district, c.state].filter(Boolean);
+    const locationStr = locationParts.length > 0 ? locationParts.join(', ') : 'N/A';
+
+    return {
+      matter: c.case_title || 'Untitled Case',
+      number: c.case_number || 'N/A',
+      client: c.client_name || 'N/A',
+      status: c.status || 'N/A',
+      location: locationStr,
+      hearing: c.next_hearing_date || 'Not scheduled',
+      viewHref: viewBase ? `${viewBase}/${c.id}` : undefined,
+    };
+  });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageSection
         title={title}
         description={description}
         actions={primaryHref && primaryLabel ? <ActionLink href={primaryHref} label={primaryLabel} /> : undefined}
       />
 
-      <Panel title="Case Register" subtitle="Search, filter, and review current matters." actions={<SearchBar placeholder="Search case title, number, or advocate..." />}>
-        <SimpleTabs tabs={[{ label: 'All Cases', active: true }, { label: 'Running' }, { label: 'Disposed Off' }, { label: 'Closed' }]} />
-        <div className="mt-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-              <p className="ml-3 text-sm text-gray-400">Loading cases...</p>
-            </div>
-          ) : error ? (
-            <div className="flex items-center justify-center py-12">
-              <p className="text-sm text-red-500">{error}</p>
-            </div>
-          ) : caseRows.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Briefcase className="w-12 h-12 text-gray-300 mb-3" />
-              <p className="text-sm text-gray-500 font-medium">No cases assigned yet</p>
-              <p className="text-xs text-gray-400 mt-1">Cases will appear here once assigned to you</p>
-            </div>
-          ) : (
-            <DataTable
-              columns={[
-                { key: 'matter', label: 'Matter' },
-                { key: 'number', label: 'Case Number' },
-                { key: 'acts', label: 'Acts' },
-                { key: 'status', label: 'Status' },
-                { key: 'advocate', label: 'Assigned Advocate' },
-                { key: 'hearing', label: 'Next Hearing' },
-              ]}
-              rows={caseRows}
-            />
-          )}
-        </div>
-      </Panel>
+      <div>
+        {loading ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 flex items-center justify-center shadow-sm">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <p className="ml-3 text-sm font-semibold text-slate-500">Loading cases...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-white rounded-2xl border border-red-200 p-12 text-center shadow-sm">
+            <p className="text-sm font-semibold text-red-600">{error}</p>
+          </div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'matter', label: 'Matter' },
+              { key: 'number', label: 'Case Number' },
+              { key: 'client', label: 'Client Name' },
+              { key: 'status', label: 'Status' },
+              { key: 'location', label: 'State & District' },
+              { key: 'hearing', label: 'Next Hearing' },
+            ]}
+            rows={caseRows}
+          />
+        )}
+      </div>
     </div>
   );
 }

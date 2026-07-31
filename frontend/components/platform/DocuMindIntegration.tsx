@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import toast from 'react-hot-toast';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
 
@@ -51,12 +52,38 @@ interface DocuMindIntegrationProps {
 export function DocuMindIntegration({ caseId, initialDraftUrl }: DocuMindIntegrationProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const docuMindOrigin = getOrigin(DOCU_MIND_URL);
   const lawfirmOrigin = typeof window !== 'undefined' ? window.location.origin : getOrigin(LAWFIRM_APP_URL);
   const iframeSrc = `${DOCU_MIND_URL}?caseId=${encodeURIComponent(caseId)}${
     lawfirmOrigin ? `&parentOrigin=${encodeURIComponent(lawfirmOrigin)}` : ''
   }`;
+
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen((prev) => {
+      const next = !prev;
+      if (next) {
+        if (containerRef.current?.requestFullscreen) {
+          containerRef.current.requestFullscreen().catch(() => {});
+        }
+      } else {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
 
   const handleIframeLoad = async () => {
     if (iframeRef.current) {
@@ -109,6 +136,10 @@ export function DocuMindIntegration({ caseId, initialDraftUrl }: DocuMindIntegra
 
       const { type, format, blob, filename } = event.data || {};
       
+      if (type === 'DOCU_MIND_TOGGLE_FULLSCREEN') {
+        toggleFullscreen();
+      }
+
       if (type === 'DOCU_MIND_EXPORT' && blob) {
         try {
           setIsSaving(true);
@@ -142,10 +173,40 @@ export function DocuMindIntegration({ caseId, initialDraftUrl }: DocuMindIntegra
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [caseId, docuMindOrigin]);
+  }, [caseId, docuMindOrigin, toggleFullscreen]);
 
   return (
-    <div className="w-full relative overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white" style={{ height: '800px' }}>
+    <div
+      ref={containerRef}
+      className={
+        isFullscreen
+          ? 'fixed inset-0 z-[99999] w-screen h-screen bg-white overflow-hidden shadow-2xl flex flex-col'
+          : 'w-full relative overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white'
+      }
+      style={isFullscreen ? { height: '100vh', width: '100vw' } : { height: '800px' }}
+    >
+      {/* Full Screen Toggle Control Button */}
+      <div className="absolute top-3 right-4 z-[60] flex items-center gap-2">
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0e2340] hover:bg-[#1a3a60] text-white text-xs font-semibold backdrop-blur-md shadow-md transition-all border border-white/20 active:scale-95 cursor-pointer"
+          title={isFullscreen ? 'Exit Full Screen (Esc)' : 'Expand to Full Screen'}
+        >
+          {isFullscreen ? (
+            <>
+              <Minimize2 className="w-3.5 h-3.5" />
+              <span>Exit Full Screen</span>
+            </>
+          ) : (
+            <>
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span>Full Screen</span>
+            </>
+          )}
+        </button>
+      </div>
+
       {(isSaving || isLoading) && (
         <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">

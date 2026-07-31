@@ -12,6 +12,7 @@ import { useTopbar } from '@/components/platform/TopbarContext';
 
 const pageTitles = [
   { match: '/firm-admin/dashboard', title: 'Admin Dashboard', sub: 'Manage cases and coordinate firm operations.' },
+  { match: '/firm-admin/cases/new', title: 'Create New Case', sub: 'Register a new matter and assign it to your branch team' },
   { match: '/firm-admin/cases', title: 'Cases', sub: 'Assign advocates, monitor hearings, and review matter status.' },
   { match: '/firm-admin/documents', title: 'Documents', sub: 'Review uploaded files, categories, and version history.' },
   { match: '/firm-admin/drafts', title: 'Drafts', sub: 'Track draft submissions, approvals, and revisions.' },
@@ -23,7 +24,7 @@ const pageTitles = [
 
 export default function FirmAdminTopbar() {
   const router = useRouter();
-  const { toggleSidebar } = useTopbar();
+  const { toggleSidebar, dynamic } = useTopbar();
 
   const handleLogout = async () => {
     try {
@@ -39,7 +40,8 @@ export default function FirmAdminTopbar() {
   };
 
   const pathname = usePathname();
-  const page = resolveRouteMeta(pathname, pageTitles, { title: 'Admin Dashboard', sub: 'Manage cases and coordinate firm operations.' });
+  const routePage = resolveRouteMeta(pathname, pageTitles, { title: 'Admin Dashboard', sub: 'Manage cases and coordinate firm operations.' });
+  const page = dynamic ?? routePage;
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 

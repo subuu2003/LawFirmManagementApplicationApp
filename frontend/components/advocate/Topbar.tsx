@@ -12,6 +12,7 @@ import { useTopbar } from '@/components/platform/TopbarContext';
 
 const pageTitles = [
   { match: '/advocate/dashboard', title: 'Advocate Dashboard', sub: 'Manage your case files, drafts, and client meetings.' },
+  { match: '/advocate/cases/new', title: 'Create New Case', sub: 'Register a new matter and assign it to your team' },
   { match: '/advocate/cases', title: 'Assigned Cases', sub: 'Review matter status, evidence, and next hearing tasks.' },
   { match: '/advocate/drafting', title: 'Drafting', sub: 'Prepare petitions, arguments, and revision-ready drafts.' },
   { match: '/advocate/calendar', title: 'Calendar', sub: 'Track hearings, deadlines, and court preparation tasks.' },
@@ -22,7 +23,7 @@ const pageTitles = [
 
 export default function AdvocateTopbar() {
   const router = useRouter();
-  const { toggleSidebar } = useTopbar();
+  const { toggleSidebar, dynamic } = useTopbar();
 
   const handleLogout = async () => {
     try {
@@ -38,7 +39,8 @@ export default function AdvocateTopbar() {
   };
 
   const pathname = usePathname();
-  const page = resolveRouteMeta(pathname, pageTitles, { title: 'Advocate Dashboard', sub: 'Manage your case files, drafts, and client meetings.' });
+  const routePage = resolveRouteMeta(pathname, pageTitles, { title: 'Advocate Dashboard', sub: 'Manage your case files, drafts, and client meetings.' });
+  const page = dynamic ?? routePage;
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 

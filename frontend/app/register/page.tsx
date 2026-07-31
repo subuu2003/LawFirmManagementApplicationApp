@@ -536,7 +536,7 @@ export default function RegisterWizard() {
       </div>
 
       {/* Right side - Form */}
-      <div className="flex-1 flex flex-col py-10 px-4 sm:px-12 lg:px-24 justify-center relative overflow-y-auto">
+      <div className="flex-1 flex flex-col py-8 sm:py-10 px-4 sm:px-8 xl:px-16 justify-center relative overflow-y-auto min-h-screen">
         <div className="lg:hidden flex items-center gap-2.5 mb-8">
           <div className="w-8 h-8 bg-[#0e2340] rounded-lg flex items-center justify-center shadow-md">
             <Scale className="w-4 h-4 text-white" />
