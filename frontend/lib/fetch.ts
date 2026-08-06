@@ -18,11 +18,11 @@ export const customFetch = async (endPoint: string, config: RequestInit = {}, he
     headers.append("x-ext-link-key", headerKey);
   }
 
-  // Define endpoints that should NEVER send a saved Authorization token (like login)
-  const isAuthEndpoint = endPoint.includes('login') || endPoint.includes('register') || endPoint.includes('otp');
+  // Define pre-login endpoints that should not send saved Authorization token
+  const isPreLoginEndpoint = endPoint.includes('login_username_password');
 
   // Inject Authorization Token from localStorage automatically if existing
-  if (typeof window !== "undefined" && !isAuthEndpoint) {
+  if (typeof window !== "undefined" && !isPreLoginEndpoint) {
     const authToken = localStorage.getItem("auth_token");
     if (authToken && !headers.has("Authorization")) {
       headers.append("Authorization", `Token ${authToken}`);

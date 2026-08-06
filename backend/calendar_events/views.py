@@ -248,10 +248,22 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def week_view(self, request):
-        """Get events for current week"""
-        today = timezone.now()
-        start_of_week = today - timedelta(days=today.weekday())
-        end_of_week = start_of_week + timedelta(days=6, hours=23, minutes=59, seconds=59)
+        """Get events for specified date's week (Sunday to Saturday)"""
+        date_str = request.query_params.get('date')
+        if date_str:
+            try:
+                from datetime import datetime
+                date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            date = timezone.now().date()
+            
+        # Sunday is start of week in calendar UI
+        offset_from_sunday = (date.weekday() + 1) % 7
+        start_of_week_date = date - timedelta(days=offset_from_sunday)
+        start_of_week = timezone.make_aware(timezone.datetime.combine(start_of_week_date, timezone.datetime.min.time()))
+        end_of_week = timezone.make_aware(timezone.datetime.combine(start_of_week_date + timedelta(days=6), timezone.datetime.max.time()))
         
         events = self.get_queryset().filter(
             start_datetime__gte=start_of_week,
@@ -264,6 +276,7 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
             'end_date': end_of_week,
             'events': serializer.data
         })
+
     
     @action(detail=False, methods=['get'])
     def day_view(self, request):

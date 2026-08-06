@@ -201,7 +201,7 @@ class EmailOTPLoginSerializer(serializers.Serializer):
             if not user.is_active:
                 raise serializers.ValidationError('User account is inactive')
         except CustomUser.DoesNotExist:
-            raise serializers.ValidationError('Email not found')
+            raise serializers.ValidationError('Email not found Please put the valid Email')
         return value
 
 

@@ -98,8 +98,18 @@ export default function ClientDashboard() {
     );
   }
 
-  const { cards, client_info, user_name, recent_cases } = data;
-  const firstName = (user_name || client_info?.name || 'Client')?.split(' ')[0] || 'Client';
+  const cards = data?.cards || {
+    my_cases: 0,
+    open_cases: 0,
+    in_progress_cases: 0,
+    closed_cases: 0,
+    my_documents: 0,
+    upcoming_hearings: 0,
+  };
+  const client_info = data?.client_info;
+  const user_name = data?.user_name || client_info?.name || 'Client';
+  const recent_cases = data?.recent_cases || [];
+  const firstName = (user_name || 'Client')?.split(' ')[0] || 'Client';
 
   const stats = [
     {

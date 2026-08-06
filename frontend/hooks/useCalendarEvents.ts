@@ -11,19 +11,19 @@ export function useCalendarEvents(initialDate: Date = new Date(), initialView: '
   const [view, setView] = useState(initialView);
 
   const fetchEvents = useCallback(async (date: Date, currentView: 'day' | 'week' | 'month') => {
-    setLoading(true);
-    setError(null);
     try {
       let endpoint = '';
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
       if (currentView === 'month') {
         endpoint = API.CALENDAR.MONTH_VIEW(date.getFullYear(), date.getMonth() + 1);
       } else if (currentView === 'week') {
-        endpoint = API.CALENDAR.WEEK_VIEW;
+        endpoint = API.CALENDAR.WEEK_VIEW(dateStr);
       } else if (currentView === 'day') {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        endpoint = API.CALENDAR.DAY_VIEW(`${year}-${month}-${day}`);
+        endpoint = API.CALENDAR.DAY_VIEW(dateStr);
       }
 
       const response = await customFetch(endpoint);

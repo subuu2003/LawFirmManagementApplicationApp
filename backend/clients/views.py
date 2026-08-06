@@ -185,7 +185,7 @@ class ClientViewSet(viewsets.ModelViewSet):
     def my_clients(self, request):
         """
         For advocates: Get all clients assigned to them.
-        Returns client details with their documents.
+        Supports backend search (?search=query) and pagination (?page=1&page_size=10).
         """
         user = request.user
         
@@ -200,7 +200,29 @@ class ClientViewSet(viewsets.ModelViewSet):
             assigned_advocate=user
         ).select_related('user_account', 'assigned_advocate')
         
-        serializer = ClientSerializer(clients, many=True)
+        # Filter by backend search parameter
+        search = request.query_params.get('search', '').strip()
+        if search:
+            clients = clients.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(phone_number__icontains=search) |
+                Q(address__icontains=search) |
+                Q(brief_summary__icontains=search)
+            )
+            
+        clients = clients.order_by('-created_at')
+        
+        # Backend Pagination if requested or if page param is present
+        page_param = request.query_params.get('page')
+        if page_param or request.query_params.get('page_size'):
+            page = self.paginate_queryset(clients)
+            if page is not None:
+                serializer = ClientSerializer(page, many=True, context={'request': request})
+                return self.get_paginated_response(serializer.data)
+                
+        serializer = ClientSerializer(clients, many=True, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'], url_path='documents', url_name='client-documents')
@@ -269,7 +291,7 @@ class ClientViewSet(viewsets.ModelViewSet):
         serializer = UserDocumentListSerializer(documents, many=True)
         
         return Response({
-            'client': ClientSerializer(client).data,
+            'client': ClientSerializer(client, context={'request': request}).data,
             'documents': serializer.data,
             'total_documents': documents.count()
         })

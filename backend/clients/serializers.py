@@ -20,6 +20,7 @@ class AdvocateListSerializer(serializers.ModelSerializer):
 class ClientSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     advocate_name = serializers.SerializerMethodField()
+    profile_image = serializers.SerializerMethodField()
     
     # Accept address fields from frontend
     address_line_1 = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -47,6 +48,19 @@ class ClientSerializer(serializers.ModelSerializer):
             name = f"{obj.assigned_advocate.first_name} {obj.assigned_advocate.last_name}".strip()
             return name or obj.assigned_advocate.email
         return None
+
+    def get_profile_image(self, obj):
+        img = obj.profile_image or (obj.user_account.profile_image if obj.user_account else None)
+        if not img:
+            return None
+        request = self.context.get('request')
+        try:
+            url = img.url
+            if request and not url.startswith('http'):
+                return request.build_absolute_uri(url)
+            return url
+        except Exception:
+            return str(img)
     
     def create(self, validated_data):
         # Extract address fields

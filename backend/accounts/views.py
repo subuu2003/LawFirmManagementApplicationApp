@@ -344,6 +344,10 @@ class CustomUserViewSet(viewsets.ModelViewSet):
         POST /api/accounts/users/verify_phone_otp/
         Body: { "phone_number": "+919876543210", "otp": "123456", "purpose": "registration" or "update" }
         """
+        import re
+        from django.conf import settings
+        from django.core.cache import cache
+
         phone_number = request.data.get('phone_number')
         otp = request.data.get('otp')
         purpose = request.data.get('purpose', 'registration')
@@ -355,8 +359,6 @@ class CustomUserViewSet(viewsets.ModelViewSet):
             )
         
         if purpose == 'registration':
-            from django.core.cache import cache
-            from django.conf import settings
             
             # TEST MODE: Accept 999999 as valid OTP in development
             if getattr(settings, 'OTP_TEST_MODE', False) and otp == '999999':
@@ -441,15 +443,22 @@ class CustomUserViewSet(viewsets.ModelViewSet):
                 otp_record.attempts += 1
                 otp_record.save()
                 
-                if otp_record.otp_code == otp:
+                is_test_otp = getattr(settings, 'OTP_TEST_MODE', False) and (otp == getattr(settings, 'OTP_TEST_CODE', '999999') or otp == '999999')
+                if is_test_otp or otp_record.otp_code == otp:
                     otp_record.is_verified = True
                     otp_record.save()
                     
-                    # Update phone number if provided
-                    new_phone = request.data.get('new_phone_number')
-                    if new_phone:
-                        request.user.phone_number = new_phone
+                    if request.user and request.user.is_authenticated:
                         request.user.is_phone_verified = True
+                        target_phone = request.data.get('phone_number') or request.data.get('new_phone_number')
+                        if target_phone:
+                            clean_target = re.sub(r'\D', '', str(target_phone))
+                            existing_owner = CustomUser.objects.filter(phone_number=clean_target).exclude(id=request.user.id).first()
+                            if existing_owner:
+                                return Response({
+                                    'error': 'This phone number is already registered to another account.'
+                                }, status=status.HTTP_400_BAD_REQUEST)
+                            request.user.phone_number = clean_target
                         request.user.save()
                     
                     return Response({
@@ -1407,45 +1416,55 @@ class CustomUserViewSet(viewsets.ModelViewSet):
         })
     
     def update(self, request, *args, **kwargs):
-        """Override update to handle phone number changes with verification"""
+        """Override update to handle phone number and email changes with verification"""
+        import re
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         
-        # Check if phone number is being changed
+        # 1. Check if phone number is being changed
         new_phone = request.data.get('phone_number')
-        if new_phone and new_phone != instance.phone_number:
-            # Require phone verification for phone number changes
-            phone_verified = request.data.get('phone_verified', False)
-            
-            if not phone_verified:
-                return Response({
-                    'error': 'Phone number change requires verification. Please verify the new phone number first.',
-                    'requires_verification': True
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Check if OTP was verified
-            try:
-                otp_record = OTPVerification.objects.filter(
-                    user=instance,
-                    otp_type='phone',
-                    is_verified=True
-                ).latest('created_at')
-                
-                # Check if verification is recent (within last hour)
-                if (timezone.now() - otp_record.created_at).total_seconds() > 3600:
-                    return Response({
-                        'error': 'Phone verification expired. Please verify again.',
-                        'requires_verification': True
-                    }, status=status.HTTP_400_BAD_REQUEST)
-                
-                # Mark phone as verified
-                instance.is_phone_verified = True
-                
-            except OTPVerification.DoesNotExist:
-                return Response({
-                    'error': 'Phone number not verified. Please verify first.',
-                    'requires_verification': True
-                }, status=status.HTTP_400_BAD_REQUEST)
+        if new_phone:
+            clean_new_phone = re.sub(r'\D', '', str(new_phone))
+            clean_old_phone = re.sub(r'\D', '', str(instance.phone_number or ''))
+            if clean_new_phone and clean_new_phone != clean_old_phone:
+                phone_verified = str(request.data.get('phone_verified', '')).lower() in ['true', '1']
+                if phone_verified:
+                    try:
+                        otp_record = OTPVerification.objects.filter(
+                            user=instance,
+                            otp_type='phone',
+                            is_verified=True
+                        ).latest('created_at')
+                        if (timezone.now() - otp_record.created_at).total_seconds() <= 3600:
+                            instance.is_phone_verified = True
+                            otp_record.delete()
+                        else:
+                            instance.is_phone_verified = False
+                    except OTPVerification.DoesNotExist:
+                        instance.is_phone_verified = False
+                else:
+                    instance.is_phone_verified = False
+
+        # 2. Check if email address is being changed
+        new_email = request.data.get('email')
+        if new_email and new_email.strip().lower() != (instance.email or '').strip().lower():
+            email_verified = str(request.data.get('email_verified', '')).lower() in ['true', '1']
+            if email_verified:
+                try:
+                    otp_record = OTPVerification.objects.filter(
+                        user=instance,
+                        otp_type='email',
+                        is_verified=True
+                    ).latest('created_at')
+                    if (timezone.now() - otp_record.created_at).total_seconds() <= 3600:
+                        instance.is_email_verified = True
+                        otp_record.delete()
+                    else:
+                        instance.is_email_verified = False
+                except OTPVerification.DoesNotExist:
+                    instance.is_email_verified = False
+            else:
+                instance.is_email_verified = False
         
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
@@ -1524,47 +1543,74 @@ class AuthenticationViewSet(viewsets.ViewSet):
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=False, methods=['post'], url_name='request_email_otp')
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny], url_name='request_email_otp')
     def request_email_otp(self, request):
-        """Request OTP for email login"""
-        serializer = EmailOTPLoginSerializer(data=request.data)
-        if serializer.is_valid():
-            email = serializer.validated_data['email']
-            user = CustomUser.objects.get(email=email)
-            
+        """Request OTP for email login or email verification"""
+        from django.core.validators import validate_email as django_validate_email
+        from django.core.exceptions import ValidationError
+        
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            django_validate_email(email)
+        except ValidationError:
+            return Response({'error': 'Please enter a valid email address'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if request.user and request.user.is_authenticated:
+            user = request.user
+            existing = CustomUser.objects.filter(email=email).exclude(id=user.id).first()
+            if existing:
+                return Response({'error': 'An account with this email address already exists'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            try:
+                user = CustomUser.objects.get(email=email)
+            except CustomUser.DoesNotExist:
+                return Response({'error': 'Email not found. Please enter a valid registered email address'}, status=status.HTTP_404_NOT_FOUND)
+        
+        if getattr(settings, 'OTP_TEST_MODE', False):
+            otp_code = getattr(settings, 'OTP_TEST_CODE', '999999')
+        else:
             otp_code = generate_otp()
-            
-            otp_obj = OTPVerification.objects.create(
-                user=user,
-                otp_type='email',
-                otp_code=otp_code,
-                expires_at=timezone.now() + timedelta(minutes=10)
-            )
-            
-            send_otp_email(email, otp_code)
-            
-            log_audit(user, 'otp_sent', f'OTP sent to email: {email}')
-            
-            return Response({
-                'success': True,
-                'message': 'OTP sent to your email',
-                'data': {
-                    'otp_id': str(otp_obj.id),
-                    'expires_in_minutes': 10
-                }
-            })
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        otp_obj = OTPVerification.objects.create(
+            user=user,
+            otp_type='email',
+            otp_code=otp_code,
+            expires_at=timezone.now() + timedelta(minutes=10)
+        )
+        
+        send_otp_email(email, otp_code)
+        
+        log_audit(user, 'otp_sent', f'OTP sent to email: {email}')
+        
+        message = f'OTP sent to {email}'
+        if getattr(settings, 'OTP_TEST_MODE', False):
+            message += ' (TEST MODE: Use 999999)'
+
+        return Response({
+            'success': True,
+            'message': message,
+            'data': {
+                'otp_id': str(otp_obj.id),
+                'expires_in_minutes': 10
+            }
+        })
     
-    @action(detail=False, methods=['post'], url_name='verify_otp')
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny], url_name='verify_otp')
     def verify_otp(self, request):
-        """Verify OTP and login"""
+        """Verify OTP and mark email/phone as verified"""
         serializer = OTPVerifySerializer(data=request.data)
         if serializer.is_valid():
             phone_number = serializer.validated_data.get('phone_number')
             email = serializer.validated_data.get('email')
             otp_code = serializer.validated_data['otp_code']
             
-            if phone_number:
+            if request.user and request.user.is_authenticated:
+                user = request.user
+                otp_type = 'phone' if phone_number and not email else 'email'
+            elif phone_number:
                 try:
                     user = CustomUser.objects.get(phone_number=phone_number)
                 except CustomUser.DoesNotExist:
@@ -1596,7 +1642,9 @@ class AuthenticationViewSet(viewsets.ViewSet):
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 
-                if otp_obj.otp_code != otp_code:
+                # Check OTP code (or TEST MODE 999999)
+                is_test_otp = getattr(settings, 'OTP_TEST_MODE', False) and (otp_code == getattr(settings, 'OTP_TEST_CODE', '999999') or otp_code == '999999')
+                if not is_test_otp and otp_obj.otp_code != otp_code:
                     otp_obj.attempts += 1
                     otp_obj.save()
                     return Response(
@@ -1618,9 +1666,11 @@ class AuthenticationViewSet(viewsets.ViewSet):
                 
                 log_audit(user, 'otp_verified', f'OTP verified via {otp_type}')
                 
+                success_message = f"{'Email' if otp_type == 'email' else 'Phone number'} verified successfully" if (request.user and request.user.is_authenticated) else 'Login successful'
+
                 return Response({
                     'success': True,
-                    'message': 'Login successful',
+                    'message': success_message,
                     'data': {
                         'access': token.key,
                         'user': CustomUserSerializer(user).data

@@ -345,8 +345,8 @@ export default function EventDetailsModal({ eventId, isOpen, onClose, onRefresh 
                   <div>
                     <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3">Assigned Personnel Details</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {event.assigned_to_details?.map((u: any) => (
-                        <div key={u.id} className="p-3 bg-white border border-slate-200 rounded-[8px] flex items-center gap-3">
+                      {event.assigned_to_details?.map((u: any, uIdx: number) => (
+                        <div key={u.id ? `user-${u.id}` : `user-${uIdx}`} className="p-3 bg-white border border-slate-200 rounded-[8px] flex items-center gap-3">
                           <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center font-medium text-xs shrink-0">
                             {u.first_name[0]}{u.last_name[0]}
                           </div>

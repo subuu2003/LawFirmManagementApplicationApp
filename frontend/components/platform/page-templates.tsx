@@ -32,6 +32,7 @@ import {
   ChevronDown,
   AlertCircle,
   Eye,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   ActivityFeed,
@@ -3623,6 +3624,9 @@ export function ProfileInformationPanel({ accent }: AccentProps) {
     bar_council_registration: '',
     bar_council_state: '',
   });
+  const [initialData, setInitialData] = useState({ email: '', phone_number: '' });
+  const [isPhoneVerifiedForNewNumber, setIsPhoneVerifiedForNewNumber] = useState(false);
+  const [isEmailVerifiedForNewEmail, setIsEmailVerifiedForNewEmail] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState('');
@@ -3632,6 +3636,17 @@ export function ProfileInformationPanel({ accent }: AccentProps) {
   const [profileFile, setProfileFile] = useState<File | null | 'REMOVE'>(null);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [systemData, setSystemData] = useState<any>(null);
+
+  // OTP Verification Modal & State
+  const [verificationModal, setVerificationModal] = useState<{
+    open: boolean;
+    type: 'phone' | 'email' | null;
+    targetValue: string;
+  }>({ open: false, type: null, targetValue: '' });
+  const [otpInput, setOtpInput] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [otpSuccess, setOtpSuccess] = useState('');
 
   useEffect(() => {
     let currentUserId: string | null = null;
@@ -3673,6 +3688,10 @@ export function ProfileInformationPanel({ accent }: AccentProps) {
             bar_council_registration: user.bar_council_registration || '',
             bar_council_state: user.bar_council_state || '',
           }));
+          setInitialData({
+            email: user.email || '',
+            phone_number: user.phone_number || ''
+          });
           setProfilePreview(user.profile_image ? (user.profile_image.startsWith('http') ? user.profile_image : `${API_BASE_URL}${user.profile_image}`) : null);
           setSystemData({
             username: user.username,
@@ -3686,7 +3705,6 @@ export function ProfileInformationPanel({ accent }: AccentProps) {
             updated_at: user.updated_at,
             password_set: user.password_set
           });
-          // Optionally update localStorage if the profile has silently drifted
           localStorage.setItem('user_details', JSON.stringify({ ...JSON.parse(details || '{}'), ...user }));
           window.dispatchEvent(new Event('profile_updated'));
         })
@@ -3703,6 +3721,132 @@ export function ProfileInformationPanel({ accent }: AccentProps) {
     : 'User';
   useTopbarTitle(fullName, fullName ? `${userTypeLabel} Profile` : '');
 
+  const cleanDigits = (val: string) => (val || '').replace(/\D/g, '');
+  const isEmailChanged = formData.email && formData.email.trim().toLowerCase() !== initialData.email.trim().toLowerCase();
+  const isPhoneChanged = cleanDigits(formData.phone_number) !== cleanDigits(initialData.phone_number);
+
+  const handleRequestOTP = async (type: 'phone' | 'email') => {
+    const targetValue = type === 'phone' ? formData.phone_number : formData.email;
+    if (!targetValue) {
+      toast.error(`Please enter a valid ${type === 'phone' ? 'phone number' : 'email address'} first.`);
+      return;
+    }
+    // Instantly open modal so user sees popup without waiting for network call!
+    setVerificationModal({ open: true, type, targetValue });
+    setOtpInput('');
+    setOtpLoading(true);
+    setOtpError('');
+    setOtpSuccess(`Sending verification code to ${targetValue}...`);
+
+    try {
+      let endpoint = type === 'phone' ? API.USERS.SEND_PHONE_OTP : API.USERS.REQUEST_EMAIL_OTP;
+      let body: any = type === 'phone'
+        ? { phone_number: targetValue, purpose: 'update' }
+        : { email: targetValue };
+
+      const res = await customFetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || data.message || (typeof data === 'object' ? Object.values(data)[0] : `Failed to send ${type} OTP`));
+      }
+
+      setOtpSuccess(data.message || `Verification code sent to ${targetValue}`);
+      toast.success(data.message || `Verification code sent to ${targetValue}`);
+    } catch (err: any) {
+      setOtpError(err.message);
+      setOtpSuccess('');
+      toast.error(err.message);
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpInput || otpInput.trim().length < 4) {
+      setOtpError('Please enter a valid verification code');
+      return;
+    }
+    setOtpLoading(true);
+    setOtpError('');
+    setOtpSuccess('');
+
+    const { type, targetValue } = verificationModal;
+    try {
+      let endpoint = type === 'phone' ? API.USERS.VERIFY_PHONE_OTP : API.USERS.VERIFY_OTP;
+      let body: any = type === 'phone'
+        ? { phone_number: targetValue, otp: otpInput.trim(), purpose: 'update' }
+        : { email: targetValue, otp_code: otpInput.trim() };
+
+      const res = await customFetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || data.message || 'OTP verification failed');
+      }
+
+      toast.success(data.message || `${type === 'phone' ? 'Phone' : 'Email'} verified successfully!`);
+      setVerificationModal({ open: false, type: null, targetValue: '' });
+      setError('');
+
+      // Immediately update local React state so Verified badge renders instantly without refresh!
+      if (type === 'phone') {
+        setIsPhoneVerifiedForNewNumber(true);
+        setInitialData(prev => ({ ...prev, phone_number: targetValue }));
+        setSystemData((prev: any) => prev ? { ...prev, is_phone_verified: true } : prev);
+      } else if (type === 'email') {
+        setIsEmailVerifiedForNewEmail(true);
+        setInitialData(prev => ({ ...prev, email: targetValue }));
+        setSystemData((prev: any) => prev ? { ...prev, is_email_verified: true } : prev);
+      }
+
+      // Sync fresh user data from backend
+      if (userId) {
+        const freshRes = await customFetch(API.USERS.DETAIL(userId));
+        if (freshRes.ok) {
+          const freshUser = await freshRes.json();
+          setSystemData({
+            username: freshUser.username,
+            user_type: freshUser.user_type,
+            firm_name: freshUser.firm_name,
+            is_email_verified: freshUser.is_email_verified,
+            is_phone_verified: freshUser.is_phone_verified,
+            is_document_verified: freshUser.is_document_verified,
+            is_active: freshUser.is_active,
+            created_at: freshUser.created_at,
+            updated_at: freshUser.updated_at,
+            password_set: freshUser.password_set
+          });
+          setFormData(prev => ({
+            ...prev,
+            email: freshUser.email || prev.email,
+            phone_number: freshUser.phone_number || prev.phone_number,
+          }));
+          setInitialData({
+            email: freshUser.email || '',
+            phone_number: freshUser.phone_number || ''
+          });
+          const details = localStorage.getItem('user_details');
+          localStorage.setItem('user_details', JSON.stringify({ ...JSON.parse(details || '{}'), ...freshUser }));
+          window.dispatchEvent(new Event('profile_updated'));
+        }
+      }
+    } catch (err: any) {
+      setOtpError(err.message);
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) {
@@ -3716,17 +3860,34 @@ export function ProfileInformationPanel({ accent }: AccentProps) {
     try {
       const payload: any = { ...formData };
 
-      // Payload cleaning for backend compatibility
       if (payload.aadhar_number) {
         payload.aadhar_number = payload.aadhar_number.replace(/\s/g, '');
       }
       if (payload.phone_number) {
-        payload.phone_number = payload.phone_number.replace(/\D/g, '');
+        const digits = payload.phone_number.replace(/\D/g, '');
+        if (digits.length > 0 && digits.length < 10) {
+          setError('Please enter a valid 10-digit phone number.');
+          setLoading(false);
+          return;
+        }
+        payload.phone_number = digits;
       }
 
       if (!payload.date_of_birth) payload.date_of_birth = null;
       if (!payload.aadhar_number) payload.aadhar_number = null;
       if (!payload.pan_number) payload.pan_number = null;
+
+      if (isPhoneChanged) {
+        payload.phone_verified = isPhoneVerifiedForNewNumber;
+      } else {
+        delete payload.phone_verified;
+      }
+
+      if (isEmailChanged) {
+        payload.email_verified = isEmailVerifiedForNewEmail;
+      } else {
+        delete payload.email_verified;
+      }
 
       let response;
       if (profileFile instanceof File) {
@@ -3752,10 +3913,30 @@ export function ProfileInformationPanel({ accent }: AccentProps) {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || data.detail || (typeof data === 'object' ? Object.values(data)[0] : 'Failed to update profile'));
+        let rawErr: any = data.error || data.detail || (typeof data === 'object' && data ? Object.values(data)[0] : 'Failed to update profile');
+        if (Array.isArray(rawErr)) {
+          rawErr = rawErr.join(', ');
+        } else if (typeof rawErr === 'object' && rawErr !== null) {
+          rawErr = JSON.stringify(rawErr);
+        }
+        let errMsg = String(rawErr || 'Failed to update profile');
+        if (errMsg.toLowerCase().includes('entered in the format') || errMsg.toLowerCase().includes('phone_number')) {
+          errMsg = 'Please enter a valid 10-digit phone number.';
+        }
+        setError(errMsg);
+        return;
       }
 
       setSuccess('Profile updated successfully');
+      setError('');
+      setInitialData({ email: data.email || formData.email, phone_number: data.phone_number || formData.phone_number });
+      setIsPhoneVerifiedForNewNumber(false);
+      setIsEmailVerifiedForNewEmail(false);
+      setSystemData((prev: any) => prev ? {
+        ...prev,
+        is_phone_verified: data.is_phone_verified,
+        is_email_verified: data.is_email_verified,
+      } : prev);
       localStorage.setItem('user_details', JSON.stringify(data));
       window.dispatchEvent(new Event('profile_updated'));
     } catch (err: any) {
@@ -3774,304 +3955,481 @@ export function ProfileInformationPanel({ accent }: AccentProps) {
   if (fetching) return <div className="p-8 text-center text-sm text-gray-400 font-medium">Loading profile...</div>;
 
   return (
-    <SplitPanels
-      left={
-        <Panel title="Profile Information" subtitle="Update your personal details and identity information.">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="flex items-center gap-6 mb-6 pb-6 border-b border-gray-100 mt-2">
-              <div className="relative group w-20 h-20 rounded-full border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
-                <input type="file" accept="image/*" onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setProfileFile(file);
-                    setProfilePreview(URL.createObjectURL(file));
-                  }
-                }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                {profilePreview ? (
-                  <>
-                    <img src={profilePreview} alt="Profile" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-white text-[10px] uppercase font-bold tracking-wider">Change</span>
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-gray-400 text-[10px] uppercase font-bold tracking-wider group-hover:text-gray-500">Photo</span>
-                )}
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">Profile Image</h3>
-                <p className="text-xs text-gray-500 mt-1 mb-2">Upload a square image (max 5MB).</p>
-                {profilePreview && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfileFile('REMOVE');
-                      setProfilePreview(null);
-                    }}
-                    className="text-xs font-semibold text-red-500 hover:text-red-600 bg-red-50 px-2 py-1 rounded"
-                  >
-                    Remove Photo
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6">
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">First Name</label>
-                <input
-                  type="text"
-                  value={formData.first_name}
-                  onChange={e => updateField('first_name', e.target.value)}
-                  className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Last Name</label>
-                <input
-                  type="text"
-                  value={formData.last_name}
-                  onChange={e => updateField('last_name', e.target.value)}
-                  className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Email Address</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={e => updateField('email', e.target.value)}
-                  className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Phone Number</label>
-                <PhoneInput
-                  value={formData.phone_number}
-                  onChange={v => updateField('phone_number', v)}
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Gender</label>
-                <select
-                  value={formData.gender}
-                  onChange={e => updateField('gender', e.target.value)}
-                  className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors appearance-none"
-                >
-                  <option value="">Select Gender</option>
-                  <option value="M">Male</option>
-                  <option value="F">Female</option>
-                  <option value="O">Other</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Date of Birth</label>
-                <input
-                  type="date"
-                  value={formData.date_of_birth}
-                  onChange={e => updateField('date_of_birth', e.target.value)}
-                  max={new Date().toISOString().split('T')[0]}
-                  className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Aadhar Number</label>
-                <AadharInput
-                  value={formData.aadhar_number}
-                  onChange={v => updateField('aadhar_number', v)}
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">PAN Number</label>
-                <PANInput
-                  value={formData.pan_number}
-                  onChange={v => updateField('pan_number', v)}
-                />
-              </div>
-
-              <div className="md:col-span-2 pt-4 border-t border-gray-100">
-                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#984c1f] mb-4">Professional Registration</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Bar Council Reg</label>
-                    <input
-                      type="text"
-                      value={formData.bar_council_registration}
-                      onChange={e => updateField('bar_council_registration', e.target.value)}
-                      placeholder="e.g. MH/1234/2020"
-                      className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Bar Council State</label>
-                    <select
-                      value={formData.bar_council_state}
-                      onChange={e => updateField('bar_council_state', e.target.value)}
-                      className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors appearance-none"
+    <>
+      <SplitPanels
+        left={
+          <Panel title="Profile Information" subtitle="Update your personal details and identity information.">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="flex items-center gap-6 mb-6 pb-6 border-b border-gray-100 mt-2">
+                <div className="relative group w-20 h-20 rounded-full border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+                  <input type="file" accept="image/*" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setProfileFile(file);
+                      setProfilePreview(URL.createObjectURL(file));
+                    }
+                  }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                  {profilePreview ? (
+                    <>
+                      <img src={profilePreview} alt="Profile" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-white text-[10px] uppercase font-bold tracking-wider">Change</span>
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-gray-400 text-[10px] uppercase font-bold tracking-wider group-hover:text-gray-500">Photo</span>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Profile Image</h3>
+                  <p className="text-xs text-gray-500 mt-1 mb-2">Upload a square image (max 5MB).</p>
+                  {profilePreview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileFile('REMOVE');
+                        setProfilePreview(null);
+                      }}
+                      className="text-xs font-semibold text-red-500 hover:text-red-600 bg-red-50 px-2 py-1 rounded"
                     >
-                      <option value="">Select State</option>
-                      {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
+                      Remove Photo
+                    </button>
+                  )}
                 </div>
               </div>
 
-              <div className="md:col-span-2 pt-4 border-t border-gray-100">
-                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#984c1f] mb-4">Address Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Address Line 1</label>
-                    <input
-                      type="text"
-                      value={formData.address_line_1}
-                      onChange={e => updateField('address_line_1', e.target.value)}
-                      className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
-                    />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">First Name</label>
+                  <input
+                    type="text"
+                    value={formData.first_name}
+                    onChange={e => updateField('first_name', e.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Last Name</label>
+                  <input
+                    type="text"
+                    value={formData.last_name}
+                    onChange={e => updateField('last_name', e.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Email Address</label>
+                    {isEmailChanged ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRequestOTP('email')}
+                        disabled={otpLoading}
+                        className="text-[11px] font-bold text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-lg transition-colors flex items-center gap-1 shadow-2xs animate-pulse"
+                      >
+                        {otpLoading && verificationModal.type === 'email' ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+                        Verify New Email
+                      </button>
+                    ) : systemData?.is_email_verified ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleRequestOTP('email')}
+                        disabled={otpLoading}
+                        className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2.5 py-0.5 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        {otpLoading && verificationModal.type === 'email' ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+                        Verify Email
+                      </button>
+                    )}
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Address Line 2</label>
-                    <input
-                      type="text"
-                      value={formData.address_line_2}
-                      onChange={e => updateField('address_line_2', e.target.value)}
-                      className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
-                    />
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={e => updateField('email', e.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Phone Number</label>
+                    {isPhoneChanged ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRequestOTP('phone')}
+                        disabled={otpLoading}
+                        className="text-[11px] font-bold text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-lg transition-colors flex items-center gap-1 shadow-2xs animate-pulse"
+                      >
+                        {otpLoading && verificationModal.type === 'phone' ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+                        Verify New Phone
+                      </button>
+                    ) : systemData?.is_phone_verified ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleRequestOTP('phone')}
+                        disabled={otpLoading}
+                        className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2.5 py-0.5 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        {otpLoading && verificationModal.type === 'phone' ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+                        Verify Phone
+                      </button>
+                    )}
                   </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Country</label>
-                    <div className="relative group">
+                  <PhoneInput
+                    value={formData.phone_number}
+                    onChange={v => updateField('phone_number', v)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Gender</label>
+                  <select
+                    value={formData.gender}
+                    onChange={e => updateField('gender', e.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors appearance-none"
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                    <option value="O">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Date of Birth</label>
+                  <input
+                    type="date"
+                    value={formData.date_of_birth}
+                    onChange={e => updateField('date_of_birth', e.target.value)}
+                    max={new Date().toISOString().split('T')[0]}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Aadhar Number</label>
+                  <AadharInput
+                    value={formData.aadhar_number}
+                    onChange={v => updateField('aadhar_number', v)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">PAN Number</label>
+                  <PANInput
+                    value={formData.pan_number}
+                    onChange={v => updateField('pan_number', v)}
+                  />
+                </div>
+
+                <div className="md:col-span-2 pt-4 border-t border-gray-100">
+                  <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#984c1f] mb-4">Professional Registration</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Bar Council Reg</label>
+                      <input
+                        type="text"
+                        value={formData.bar_council_registration}
+                        onChange={e => updateField('bar_council_registration', e.target.value)}
+                        placeholder="e.g. MH/1234/2020"
+                        className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Bar Council State</label>
                       <select
-                        value={formData.country}
-                        onChange={e => {
-                          updateField('country', e.target.value);
-                          updateField('state', '');
-                          updateField('city', '');
-                        }}
+                        value={formData.bar_council_state}
+                        onChange={e => updateField('bar_council_state', e.target.value)}
                         className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors appearance-none"
                       >
-                        <option value="">Select Country</option>
-                        {Country.getAllCountries().map(c => <option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}
-                      </select>
-                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none group-hover:text-gray-600 transition-colors" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">State</label>
-                    <div className="relative group">
-                      <select
-                        value={formData.state}
-                        disabled={!formData.country}
-                        onChange={e => {
-                          updateField('state', e.target.value);
-                          updateField('city', '');
-                        }}
-                        className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors appearance-none disabled:opacity-50"
-                      >
                         <option value="">Select State</option>
-                        {formData.country && State.getStatesOfCountry(formData.country).map(s => <option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
+                        {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
-                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none group-hover:text-gray-600 transition-colors" />
                     </div>
                   </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">City</label>
-                    <div className="relative group">
-                      {formData.country && formData.state && City.getCitiesOfState(formData.country, formData.state).length > 0 ? (
-                        <>
-                          <select
+                </div>
+
+                <div className="md:col-span-2 pt-4 border-t border-gray-100">
+                  <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#984c1f] mb-4">Address Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Address Line 1</label>
+                      <input
+                        type="text"
+                        value={formData.address_line_1}
+                        onChange={e => updateField('address_line_1', e.target.value)}
+                        className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Address Line 2</label>
+                      <input
+                        type="text"
+                        value={formData.address_line_2}
+                        onChange={e => updateField('address_line_2', e.target.value)}
+                        className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Country</label>
+                      <div className="relative group">
+                        <select
+                          value={formData.country}
+                          onChange={e => {
+                            updateField('country', e.target.value);
+                            updateField('state', '');
+                            updateField('city', '');
+                          }}
+                          className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors appearance-none"
+                        >
+                          <option value="">Select Country</option>
+                          {Country.getAllCountries().map(c => <option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none group-hover:text-gray-600 transition-colors" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">State</label>
+                      <div className="relative group">
+                        <select
+                          value={formData.state}
+                          disabled={!formData.country}
+                          onChange={e => {
+                            updateField('state', e.target.value);
+                            updateField('city', '');
+                          }}
+                          className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors appearance-none disabled:opacity-50"
+                        >
+                          <option value="">Select State</option>
+                          {formData.country && State.getStatesOfCountry(formData.country).map(s => <option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none group-hover:text-gray-600 transition-colors" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">City</label>
+                      <div className="relative group">
+                        {formData.country && formData.state && City.getCitiesOfState(formData.country, formData.state).length > 0 ? (
+                          <>
+                            <select
+                              value={formData.city}
+                              onChange={e => updateField('city', e.target.value)}
+                              className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors appearance-none"
+                            >
+                              <option value="">Select City</option>
+                              {City.getCitiesOfState(formData.country, formData.state).map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                              <option value="Other">Other</option>
+                            </select>
+                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none group-hover:text-gray-600 transition-colors" />
+                          </>
+                        ) : (
+                          <input
+                            type="text"
                             value={formData.city}
                             onChange={e => updateField('city', e.target.value)}
-                            className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors appearance-none"
-                          >
-                            <option value="">Select City</option>
-                            {City.getCitiesOfState(formData.country, formData.state).map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                            <option value="Other">Other</option>
-                          </select>
-                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none group-hover:text-gray-600 transition-colors" />
-                        </>
-                      ) : (
-                        <input
-                          type="text"
-                          value={formData.city}
-                          onChange={e => updateField('city', e.target.value)}
-                          placeholder="Specify city..."
-                          className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
-                        />
-                      )}
+                            placeholder="Specify city..."
+                            className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors"
+                          />
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Postal Code</label>
+                      <input
+                        type="text"
+                        value={formData.postal_code}
+                        onChange={e => updateField('postal_code', e.target.value.replace(/\D/g, ''))}
+                        placeholder="e.g. 400001"
+                        className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors shadow-sm shadow-[#0e2340]/[0.02]"
+                      />
                     </div>
                   </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-400">Postal Code</label>
-                    <input
-                      type="text"
-                      value={formData.postal_code}
-                      onChange={e => updateField('postal_code', e.target.value.replace(/\D/g, ''))}
-                      placeholder="e.g. 400001"
-                      className="h-11 w-full rounded-xl border border-gray-200 bg-[#f7f8fa] px-3.5 text-sm text-black font-semibold outline-none focus:border-[#0e2340] transition-colors shadow-sm shadow-[#0e2340]/[0.02]"
-                    />
+                </div>
+              </div>
+
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-semibold text-red-600">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                    <span>{typeof error === 'string' ? error : String(error)}</span>
+                  </div>
+                  {typeof error === 'string' && (error.toLowerCase().includes('requires verification') || error.toLowerCase().includes('please verify')) && (
+                    <button
+                      type="button"
+                      onClick={() => handleRequestOTP(error.toLowerCase().includes('phone') || isPhoneChanged ? 'phone' : 'email')}
+                      className="shrink-0 bg-red-600 text-white font-bold px-3.5 py-1.5 rounded-lg hover:bg-red-700 transition-colors shadow-2xs flex items-center gap-1.5"
+                    >
+                      <ShieldCheck className="w-4 h-4" /> Verify Now
+                    </button>
+                  )}
+                </div>
+              )}
+              {success && <p className="text-xs font-semibold text-emerald-600 bg-emerald-50 p-3 rounded-lg border border-emerald-100">{success}</p>}
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex items-center gap-2 rounded-xl bg-[#0e2340] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-all shadow-sm disabled:opacity-50"
+                  style={{ backgroundColor: accent }}
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </Panel>
+        }
+        right={
+          <div className="space-y-6">
+            {systemData ? (
+              <Panel title="System Status" subtitle="Read-only account properties.">
+                <div className="space-y-6">
+                  <div className="flex flex-col gap-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#984c1f]">Verifications</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge label={systemData.is_active ? 'Active' : 'Inactive'} tone={systemData.is_active ? 'success' : 'default'} />
+
+                      {isEmailChanged ? (
+                        <button type="button" onClick={() => handleRequestOTP('email')} className="focus:outline-none">
+                          <Badge label="New Email Unverified (Click to Verify)" tone="warning" />
+                        </button>
+                      ) : systemData.is_email_verified ? (
+                        <Badge label="Email Verified" tone="success" />
+                      ) : (
+                        <button type="button" onClick={() => handleRequestOTP('email')} className="focus:outline-none">
+                          <Badge label="Email Unverified (Click to Verify)" tone="warning" />
+                        </button>
+                      )}
+
+                      {isPhoneChanged ? (
+                        <button type="button" onClick={() => handleRequestOTP('phone')} className="focus:outline-none">
+                          <Badge label="New Phone Unverified (Click to Verify)" tone="warning" />
+                        </button>
+                      ) : systemData.is_phone_verified ? (
+                        <Badge label="Phone Verified" tone="success" />
+                      ) : (
+                        <button type="button" onClick={() => handleRequestOTP('phone')} className="focus:outline-none">
+                          <Badge label="Phone Unverified (Click to Verify)" tone="warning" />
+                        </button>
+                      )}
+
+                      <Badge label={systemData.is_document_verified ? 'Docs Verified' : 'Docs Unverified'} tone={systemData.is_document_verified ? 'success' : 'warning'} />
+                      <Badge label={systemData.password_set ? 'Password Locked' : 'No Password'} tone={systemData.password_set ? 'info' : 'warning'} />
+                    </div>
+                  </div>
+                  <div className="space-y-4 pt-4 border-t border-gray-100">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-1.5">Platform Username</p>
+                      <p className="text-sm font-medium text-gray-900 border border-gray-100 bg-gray-50/50 rounded-xl px-3.5 py-3 cursor-not-allowed truncate">{systemData.username || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-1.5">System Role</p>
+                      <p className="text-sm font-medium text-gray-900 border border-gray-100 bg-gray-50/50 rounded-xl px-3.5 py-3 cursor-not-allowed capitalize">{systemData.user_type ? systemData.user_type.replace('_', ' ') : '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-1.5">Primary Firm Affinity</p>
+                      <p className="text-sm font-medium text-gray-900 border border-gray-100 bg-gray-50/50 rounded-xl px-3.5 py-3 cursor-not-allowed truncate">{systemData.firm_name || 'Unassigned'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-1.5">Account Registry Date</p>
+                      <p className="text-sm font-medium text-gray-900 border border-gray-100 bg-gray-50/50 rounded-xl px-3.5 py-3 cursor-not-allowed">{systemData.created_at ? new Date(systemData.created_at).toLocaleDateString() : '-'}</p>
+                    </div>
                   </div>
                 </div>
+              </Panel>
+            ) : (
+              <InfoAside accent={accent} title="Identity Info" items={['Update your personal details.', 'Change your core contact mechanisms.']} />
+            )}
+          </div>
+        }
+      />
+
+      {/* OTP Verification Modal */}
+      {verificationModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-5 relative">
+            <button
+              type="button"
+              onClick={() => setVerificationModal({ open: false, type: null, targetValue: '' })}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-900 flex items-center justify-center shrink-0 border border-purple-100">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Verify {verificationModal.type === 'phone' ? 'Phone Number' : 'Email Address'}
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Enter verification code sent to <span className="font-bold text-slate-800">{verificationModal.targetValue}</span>
+                </p>
               </div>
             </div>
 
-            {error && <p className="text-xs font-semibold text-red-500 bg-red-50 p-3 rounded-lg border border-red-100">{error}</p>}
-            {success && <p className="text-xs font-semibold text-emerald-600 bg-emerald-50 p-3 rounded-lg border border-emerald-100">{success}</p>}
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex items-center gap-2 rounded-xl bg-[#0e2340] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-all shadow-sm disabled:opacity-50"
-                style={{ backgroundColor: accent }}
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                {loading ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </form>
-        </Panel>
-      }
-      right={
-        <div className="space-y-6">
-          {systemData ? (
-            <Panel title="System Status" subtitle="Read-only account properties.">
-              <div className="space-y-6">
-                <div className="flex flex-col gap-3">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#984c1f]">Verifications</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge label={systemData.is_active ? 'Active' : 'Inactive'} tone={systemData.is_active ? 'success' : 'default'} />
-                    <Badge label={systemData.is_email_verified ? 'Email Verified' : 'Email Unverified'} tone={systemData.is_email_verified ? 'success' : 'warning'} />
-                    <Badge label={systemData.is_phone_verified ? 'Phone Verified' : 'Phone Unverified'} tone={systemData.is_phone_verified ? 'success' : 'warning'} />
-                    <Badge label={systemData.is_document_verified ? 'Docs Verified' : 'Docs Unverified'} tone={systemData.is_document_verified ? 'success' : 'warning'} />
-                    <Badge label={systemData.password_set ? 'Password Locked' : 'No Password'} tone={systemData.password_set ? 'info' : 'warning'} />
-                  </div>
-                </div>
-                <div className="space-y-4 pt-4 border-t border-gray-100">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-1.5">Platform Username</p>
-                    <p className="text-sm font-medium text-gray-900 border border-gray-100 bg-gray-50/50 rounded-xl px-3.5 py-3 cursor-not-allowed truncate">{systemData.username || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-1.5">System Role</p>
-                    <p className="text-sm font-medium text-gray-900 border border-gray-100 bg-gray-50/50 rounded-xl px-3.5 py-3 cursor-not-allowed capitalize">{systemData.user_type ? systemData.user_type.replace('_', ' ') : '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-1.5">Primary Firm Affinity</p>
-                    <p className="text-sm font-medium text-gray-900 border border-gray-100 bg-gray-50/50 rounded-xl px-3.5 py-3 cursor-not-allowed truncate">{systemData.firm_name || 'Unassigned'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-1.5">Account Registry Date</p>
-                    <p className="text-sm font-medium text-gray-900 border border-gray-100 bg-gray-50/50 rounded-xl px-3.5 py-3 cursor-not-allowed">{systemData.created_at ? new Date(systemData.created_at).toLocaleDateString() : '-'}</p>
-                  </div>
-                </div>
+            <form onSubmit={handleVerifyOTP} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  6-Digit Verification Code
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="e.g. 999999"
+                  value={otpInput}
+                  onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                  className="w-full text-center text-xl font-bold tracking-[0.3em] h-12 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 outline-none transition-all text-slate-900"
+                  autoFocus
+                />
+                <p className="text-[11px] text-slate-400 mt-1 font-medium text-center">
+                  Test Mode Code: <span className="font-bold text-purple-700">999999</span>
+                </p>
               </div>
-            </Panel>
-          ) : (
-            <InfoAside accent={accent} title="Identity Info" items={['Update your personal details.', 'Change your core contact mechanisms.']} />
-          )}
+
+              {otpError && (
+                <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-semibold text-red-600 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{otpError}</span>
+                </div>
+              )}
+
+              {otpSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-semibold text-emerald-700 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{otpSuccess}</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleRequestOTP(verificationModal.type!)}
+                  disabled={otpLoading}
+                  className="flex-1 py-2.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  Resend Code
+                </button>
+                <button
+                  type="submit"
+                  disabled={otpLoading || otpInput.length < 4}
+                  className="flex-1 py-2.5 text-xs font-bold text-white bg-[#4a1c40] hover:opacity-90 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  {otpLoading ? 'Verifying...' : 'Verify Code'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      }
-    />
+      )}
+    </>
   );
 }
 

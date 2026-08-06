@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { 
-  FileText, 
-  Download, 
-  Send, 
-  Filter, 
-  Search, 
-  MoreVertical, 
-  ArrowUpRight, 
+import {
+  FileText,
+  Download,
+  Send,
+  Filter,
+  Search,
+  MoreVertical,
+  ArrowUpRight,
   ArrowDownLeft,
   CheckCircle2,
   Clock,
@@ -34,8 +34,8 @@ const STATUS_MAP = {
   draft: { tone: 'info' as const, icon: <FileText className="w-3.5 h-3.5" /> },
 };
 
-export default function ProfessionalBillingHub({ 
-  role = 'admin', 
+export default function ProfessionalBillingHub({
+  role = 'admin',
   isLoading = false,
   entries = [],
   onAddEntry,
@@ -44,8 +44,8 @@ export default function ProfessionalBillingHub({
   const [query, setQuery] = useState('');
 
   const filteredEntries = useMemo(() => {
-    return (entries || []).filter(entry => 
-      (entry.case_title || '').toLowerCase().includes(query.toLowerCase()) || 
+    return (entries || []).filter(entry =>
+      (entry.case_title || '').toLowerCase().includes(query.toLowerCase()) ||
       (entry.user_name || '').toLowerCase().includes(query.toLowerCase()) ||
       (entry.description || '').toLowerCase().includes(query.toLowerCase())
     );
@@ -65,18 +65,13 @@ export default function ProfessionalBillingHub({
   return (
     <div className="space-y-8">
       {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <MetricCard label="Total Revenue" value="Rs. 12.8L" hint="+12% from last month" accent="#0e2340" />
-        <MetricCard label="Pending" value="Rs. 2.4L" hint="Across 8 invoices" accent="#f59e0b" />
-        <MetricCard label="Overdue" value="Rs. 0.8L" hint="3 high priority" accent="#ef4444" />
-        <MetricCard label="Collection Rate" value="94.2%" hint="Historical average" accent="#10b981" />
-      </div>
+
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-8">
         {/* Main Ledger */}
         <div className="space-y-6">
-          <Panel 
-            title="Time Entries Ledger" 
+          <Panel
+            title="Time Entries Ledger"
             subtitle="Manage billable hours, track case activities, and generate invoices."
             actions={
               <div className="flex items-center gap-3">
@@ -100,8 +95,8 @@ export default function ProfessionalBillingHub({
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {filteredEntries.map((entry) => (
-                    <motion.tr 
-                      key={entry.id} 
+                    <motion.tr
+                      key={entry.id}
                       onClick={() => onEntryClick && onEntryClick(entry.id)}
                       className="group hover:bg-gray-50/50 transition-colors cursor-pointer"
                       initial={{ opacity: 0, y: 10 }}
@@ -124,20 +119,20 @@ export default function ProfessionalBillingHub({
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="flex items-center justify-center">
-                          <Badge 
-                            label={entry.status.toUpperCase()} 
+                          <Badge
+                            label={entry.status.toUpperCase()}
                             tone={
-                               entry.status === 'submitted' ? 'info' :
-                               entry.status === 'approved' ? 'success' :
-                               entry.status === 'invoiced' ? 'warning' : 'neutral'
-                            } 
+                              entry.status === 'submitted' ? 'info' :
+                                entry.status === 'approved' ? 'success' :
+                                  entry.status === 'invoiced' ? 'warning' : 'neutral'
+                            }
                           />
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex flex-col items-end">
-                           <span className="font-bold text-sm text-gray-900">₹ {entry.amount || '0.00'}</span>
-                           <span className="text-[11px] text-gray-500 font-bold">{entry.hours} hrs @ ₹{entry.hourly_rate}/hr</span>
+                          <span className="font-bold text-sm text-gray-900">₹ {entry.amount || '0.00'}</span>
+                          <span className="text-[11px] text-gray-500 font-bold">{entry.hours} hrs @ ₹{entry.hourly_rate}/hr</span>
                         </div>
                       </td>
                     </motion.tr>
@@ -163,28 +158,7 @@ export default function ProfessionalBillingHub({
             </div>
           </Panel>
 
-          <Panel title="Remittance Guide" subtitle="Help Center">
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100/50 space-y-2">
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Auto-Sync</span>
-                </div>
-                <p className="text-xs text-emerald-800/80 leading-relaxed font-medium">
-                  Invoices are automatically generated for disposal matters every Friday.
-                </p>
-              </div>
-              <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100/50 space-y-2">
-                <div className="flex items-center gap-2 text-amber-700">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Compliance</span>
-                </div>
-                <p className="text-xs text-amber-800/80 leading-relaxed font-medium">
-                  3 overdue payments have crossed the 30-day escalation threshold.
-                </p>
-              </div>
-            </div>
-          </Panel>
+
         </div>
       </div>
     </div>
