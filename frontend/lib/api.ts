@@ -43,6 +43,9 @@ export const API = {
     // Phone verification endpoints
     SEND_PHONE_OTP: "/api/users/send_phone_otp/",
     VERIFY_PHONE_OTP: "/api/users/verify_phone_otp/",
+    // Email verification endpoints
+    REQUEST_EMAIL_OTP: "/api/auth/request_email_otp/",
+    VERIFY_OTP: "/api/auth/verify_otp/",
     // Paralegal assignment
     ASSIGN_PARALEGAL: "/api/users/assign_paralegal/",
     UNASSIGN_PARALEGAL: "/api/users/unassign_paralegal/",
@@ -138,7 +141,7 @@ export const API = {
   CALENDAR: {
     EVENTS: "/api/calendar/events/",
     MONTH_VIEW: (year: number, month: number) => `/api/calendar/events/month_view/?year=${year}&month=${month}`,
-    WEEK_VIEW: "/api/calendar/events/week_view/",
+    WEEK_VIEW: (date?: string) => date ? `/api/calendar/events/week_view/?date=${date}` : "/api/calendar/events/week_view/",
     DAY_VIEW: (date: string) => `/api/calendar/events/day_view/?date=${date}`,
     TODAY: "/api/calendar/events/today/",
     UPCOMING: "/api/calendar/events/upcoming/",

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import ProfessionalCalendar from '@/components/platform/ProfessionalCalendar';
+import EventDetailsModal from '@/components/platform/EventDetailsModal';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { customFetch } from '@/lib/fetch';
 import { API } from '@/lib/api';
@@ -37,10 +38,17 @@ export default function AdvocateCalendarPage() {
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
+
+  const handleEventClick = (id: string) => {
+    setSelectedEventId(id);
+    setIsDetailsOpen(true);
+  };
 
   const defaultStart = () => {
     const d = new Date();
@@ -143,7 +151,7 @@ export default function AdvocateCalendarPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto">
       {error && (
         <div className="bg-amber-50 border border-amber-200 text-amber-700 px-6 py-4 rounded-3xl flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-amber-500" />
@@ -158,6 +166,17 @@ export default function AdvocateCalendarPage() {
         onDateChange={setCurrentDate}
         onViewChange={setView}
         onAddEvent={(date) => openModal(date)}
+        onEventClick={handleEventClick}
+      />
+
+      <EventDetailsModal
+        eventId={selectedEventId}
+        isOpen={isDetailsOpen}
+        onClose={() => {
+          setIsDetailsOpen(false);
+          setSelectedEventId(null);
+        }}
+        onRefresh={refresh}
       />
 
       {/* Create Event Modal */}

@@ -56,6 +56,7 @@ export default function ClientProfilePage() {
         setForm({
           first_name: me.first_name || '',
           last_name: me.last_name || '',
+          email: me.email || '',
           phone_number: me.phone_number || '',
           gender: me.gender || '',
           date_of_birth: me.date_of_birth || '',
@@ -94,7 +95,6 @@ export default function ClientProfilePage() {
           if (v !== null && v !== undefined && v !== '') {
             let val = String(v);
             if (k === 'aadhar_number') val = val.replace(/\s/g, '');
-            if (k === 'phone_number') val = val.replace(/\D/g, '');
             fd.append(k, val);
           }
         });
@@ -104,9 +104,14 @@ export default function ClientProfilePage() {
         const payload: any = { ...form };
         if (payload.aadhar_number) {
           payload.aadhar_number = payload.aadhar_number.replace(/\s/g, '');
+        } else {
+          payload.aadhar_number = null;
         }
-        if (payload.phone_number) {
-          payload.phone_number = payload.phone_number.replace(/\D/g, '');
+        if (!payload.pan_number) {
+          payload.pan_number = null;
+        }
+        if (!payload.date_of_birth) {
+          payload.date_of_birth = null;
         }
         if (profileFile === 'REMOVE') payload.profile_image = null;
         response = await customFetch(API.USERS.DETAIL(user.id), {
@@ -126,6 +131,16 @@ export default function ClientProfilePage() {
         : null);
       setProfileFile(null);
       setSuccess('Profile updated successfully!');
+      
+      // Update localStorage user details
+      const stored = localStorage.getItem('user_details');
+      if (stored) {
+        try {
+          const existing = JSON.parse(stored);
+          localStorage.setItem('user_details', JSON.stringify({ ...existing, ...updated }));
+        } catch (_) {}
+      }
+
       // Dispatch so topbar refreshes
       window.dispatchEvent(new Event('client-profile-updated'));
       setTimeout(() => setSuccess(''), 4000);
@@ -226,14 +241,37 @@ export default function ClientProfilePage() {
               ].map(({ key, label }) => (
                 <div key={key}>
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">{label}</label>
-                  <input value={form[key]} onChange={e => set(key, e.target.value)}
+                  <input value={form[key] || ''} onChange={e => set(key, e.target.value)}
                     className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 text-sm font-semibold text-gray-900 outline-none focus:border-[#1f2937] transition-colors" />
                 </div>
               ))}
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">Phone</label>
-                <PhoneInput value={form.phone_number} onChange={v => set('phone_number', v)} />
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="email"
+                    value={form.email || ''}
+                    onChange={e => set('email', e.target.value)}
+                    placeholder="name@example.com"
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 text-sm font-semibold text-gray-900 outline-none focus:border-[#1f2937] transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">Phone Number</label>
+                <div className="relative">
+                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="tel"
+                    value={form.phone_number || ''}
+                    onChange={e => set('phone_number', e.target.value)}
+                    placeholder="+91 9876543210"
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 text-sm font-semibold text-gray-900 outline-none focus:border-[#1f2937] transition-colors"
+                  />
+                </div>
               </div>
 
               <div>
@@ -340,9 +378,9 @@ export default function ClientProfilePage() {
             </div>
             <div className="p-5 space-y-3">
               {[
-                { icon: Mail, label: 'Email', value: user?.email },
-                { icon: Phone, label: 'Phone', value: user?.phone_number || '—' },
-                { icon: Building2, label: 'Firm', value: user?.firm_name || '—' },
+                { icon: Mail, label: 'Email', value: form.email || user?.email || '—' },
+                { icon: Phone, label: 'Phone', value: form.phone_number || user?.phone_number || '—' },
+                { icon: Building2, label: 'Firm', value: user?.firm_name || 'Independent Practice (Solo)' },
                 { icon: MapPin, label: 'Username', value: user?.username },
                 { icon: Calendar, label: 'Joined', value: user?.created_at ? new Date(user.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' },
               ].map((row, i) => (

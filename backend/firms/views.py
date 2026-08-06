@@ -446,19 +446,27 @@ class DashboardViewSet(viewsets.ViewSet):
     
     def get_client_stats(self, user, firm):
         """Client sees stats for their own cases and documents"""
-        if not firm:
-            return {'error': 'No firm context found'}
-            
-        # Get client profile for THIS firm
-        client_profile = user.client_profiles.filter(firm=firm).first()
+        client_profile = user.client_profiles.filter(firm=firm).first() if firm else user.client_profiles.first()
         
         if not client_profile:
             return {
                 'cards': {
                     'my_cases': 0,
+                    'open_cases': 0,
+                    'in_progress_cases': 0,
+                    'closed_cases': 0,
                     'my_documents': 0,
+                    'upcoming_hearings': 0,
                 },
-                'message': 'No client profile found for this firm'
+                'client_info': {
+                    'id': str(user.id),
+                    'name': user.get_full_name() or user.username,
+                    'email': user.email or '',
+                    'phone': user.phone_number or '',
+                    'assigned_advocate': None,
+                },
+                'recent_cases': [],
+                'message': 'No client profile found yet'
             }
         
         # My cases

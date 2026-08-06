@@ -1,11 +1,20 @@
 'use client';
 
+import { useState } from 'react';
 import ProfessionalCalendar from '@/components/platform/ProfessionalCalendar';
+import EventDetailsModal from '@/components/platform/EventDetailsModal';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { AlertCircle } from 'lucide-react';
 
 export default function ClientCalendarPage() {
-  const { events, loading, error, setCurrentDate, setView } = useCalendarEvents();
+  const { events, loading, error, setCurrentDate, setView, refresh } = useCalendarEvents();
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  const handleEventClick = (id: string) => {
+    setSelectedEventId(id);
+    setIsDetailsOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -22,7 +31,19 @@ export default function ClientCalendarPage() {
         role="client"
         onDateChange={setCurrentDate}
         onViewChange={setView}
+        onEventClick={handleEventClick}
+      />
+
+      <EventDetailsModal
+        eventId={selectedEventId}
+        isOpen={isDetailsOpen}
+        onClose={() => {
+          setIsDetailsOpen(false);
+          setSelectedEventId(null);
+        }}
+        onRefresh={refresh}
       />
     </div>
   );
 }
+

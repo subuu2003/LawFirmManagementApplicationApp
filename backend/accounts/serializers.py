@@ -80,8 +80,34 @@ class CustomUserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'is_phone_verified', 
                            'is_email_verified', 'is_document_verified', 'user_type', 'firm', 'uploaded_documents']
         extra_kwargs = {
-            'password': {'write_only': True}
+            'password': {'write_only': True},
+            'aadhar_number': {'allow_null': True, 'required': False},
+            'pan_number': {'allow_null': True, 'required': False},
+            'date_of_birth': {'allow_null': True, 'required': False},
         }
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            data = data.copy()
+            if 'aadhar_number' in data and (data['aadhar_number'] == '' or data['aadhar_number'] is None):
+                data['aadhar_number'] = None
+            if 'pan_number' in data and (data['pan_number'] == '' or data['pan_number'] is None):
+                data['pan_number'] = None
+            if 'date_of_birth' in data and (data['date_of_birth'] == '' or data['date_of_birth'] is None):
+                data['date_of_birth'] = None
+        return super().to_internal_value(data)
+
+    def validate_aadhar_number(self, value):
+        if not value or not str(value).strip():
+            return None
+        clean_val = str(value).replace(' ', '').replace('-', '').strip()
+        return clean_val if clean_val else None
+
+    def validate_pan_number(self, value):
+        if not value or not str(value).strip():
+            return None
+        clean_val = str(value).strip().upper()
+        return clean_val if clean_val else None
 
     def validate(self, data):
         # Auto-generate username from email or phone if not provided
@@ -95,12 +121,18 @@ class CustomUserSerializer(serializers.ModelSerializer):
             
         username = data.get('username')
         
-        # Check if user already exists
+        # Check if ANOTHER user already exists with this email or username
         existing_user = None
         if email:
-            existing_user = CustomUser.objects.filter(email=email).first()
+            qs = CustomUser.objects.filter(email=email)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            existing_user = qs.first()
         elif username:
-            existing_user = CustomUser.objects.filter(username=username).first()
+            qs = CustomUser.objects.filter(username=username)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            existing_user = qs.first()
             
         if existing_user:
             # If the user is a client, we allow "re-adding" them if they aren't in THIS firm yet
@@ -112,10 +144,35 @@ class CustomUserSerializer(serializers.ModelSerializer):
             else:
                 raise serializers.ValidationError({'email': 'A user with this email already exists.'})
                 
-        if phone_number and not existing_user and CustomUser.objects.filter(phone_number=phone_number).exists():
-             raise serializers.ValidationError({'phone_number': 'A user with this phone number already exists.'})
+        if phone_number:
+            phone_qs = CustomUser.objects.filter(phone_number=phone_number)
+            if self.instance:
+                phone_qs = phone_qs.exclude(pk=self.instance.pk)
+            if phone_qs.exists():
+                 raise serializers.ValidationError({'phone_number': 'A user with this phone number already exists.'})
             
         return data
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        
+        # Sync updated profile info to associated Client profile records
+        if instance.user_type == 'client':
+            from clients.models import Client as ClientRecord
+            client_profiles = ClientRecord.objects.filter(user_account=instance)
+            for cp in client_profiles:
+                if 'first_name' in validated_data:
+                    cp.first_name = instance.first_name
+                if 'last_name' in validated_data:
+                    cp.last_name = instance.last_name
+                if 'email' in validated_data:
+                    cp.email = instance.email
+                if 'phone_number' in validated_data:
+                    cp.phone_number = instance.phone_number
+                if 'profile_image' in validated_data:
+                    cp.profile_image = instance.profile_image
+                cp.save()
+        return instance
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -421,7 +478,7 @@ class EmailOTPLoginSerializer(serializers.Serializer):
             if not user.is_active:
                 raise serializers.ValidationError('User account is inactive')
         except CustomUser.DoesNotExist:
-            raise serializers.ValidationError('Email not found')
+            raise serializers.ValidationError('Email not found Please put the valid Email')
         return value
 
 
